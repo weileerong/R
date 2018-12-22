@@ -1,0 +1,183 @@
+---
+title: "ggplot2"
+author: "Lirong Wei"
+date: "December 2, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. Correlation
+
+```{r}
+library(ggplot2)
+options(scipen = 999) #turn-off scientific notation like
+theme_set(theme_bw()) #bw theme
+data("midwest",package = "ggplot2")
+```
+
+```{r}
+#scatterplot
+gg <- ggplot(midwest,aes(x=area,y=poptotal))+
+  geom_point(aes(col=state,size=popdensity))+
+  geom_smooth(method = "loess",se=F)+
+  xlim(c(0,0.1))+
+  ylim(c(0,500000))+
+  labs(subtitle = "Area Vs Population",
+       y="Population",
+       x="Area",
+       title = "Scatterplot",
+       caption="Source:midwest")
+plot(gg)
+```
+```{r}
+#scatterplot with encircling
+library("ggalt")
+midwest_select <- midwest[midwest$poptotal > 350000 &
+                            midwest$poptotal <= 500000 &
+                            midwest$area > 0.01 &
+                            midwest$area < 0.1,]
+ggplot(midwest,aes(x=area,y=poptotal))+
+  geom_point(aes(col=state,size=popdensity))+
+  geom_smooth(method="lm",se=F)+
+  xlim(c(0,0.1))+
+  ylim(c(0,500000))+
+  geom_encircle(aes(x=area,y=poptotal),data=midwest_select,
+                color="red",size=2,
+                expand=0.08) + 
+  labs(subtitle = "Area Vs Population",
+       y="Population",
+       x="Area",
+       title="Scatterplot + Encircle",
+       caption="Scource:midwest")
+```
+
+```{r}
+data(mpg,package = "ggplot2")
+
+g <- ggplot(mpg,aes(cty,hwy))
+
+g + geom_point()+geom_smooth(method="lm",se=F)+
+  labs(subtitle = "mpg:city vs highway mileage",
+        y ="hwy",
+        x = "cty",
+        title = "Scatterplot with overlapping points",
+        caption = "Scource: midwest")
+```
+```{r}
+#jitter plot
+g <- ggplot(mpg,aes(cty,hwy))
+g + geom_jitter(width = .5,size=1)+
+  labs(subtitle = "mpg:city vs highway mileage",
+       y="hwy",
+       x="cty",
+       title="Jittered Points")
+```
+```{r}
+#counts chart
+g <- ggplot(mpg,aes(cty,hwy))
+g + geom_count(col="tomato3",show.legend = F) +
+  labs(subtitle = "mpg:city vs highway mileage",y="hwy", x="cty",title="counts plot")
+```
+
+```{r}
+#bubble plot
+mpg_select = mpg[mpg$manufacturer %in% c("audi","ford","honda","hyundai"),]
+
+g <- ggplot(mpg_select,aes(displ,cty)) + 
+              labs(subtitle = "mpg:Displacement vs City Mileage",
+                   title="Bubble chart")
+g + geom_jitter(aes(col=manufacturer,size=hwy)) +
+  geom_smooth(aes(col=manufacturer),method = "lm",se=FALSE)
+```
+
+```{r}
+#margianal histogram/bosplot
+library(ggExtra)
+
+mpg_select <- mpg[mpg$hwy>=35 & mpg$cty >27,]
+g <- ggplot(mpg,aes(cty,hwy))+
+  geom_count()+
+  geom_smooth(method="lm",se=FALSE)
+
+plot(ggMarginal(g,type="histogram",fill="transparent"))
+plot(ggMarginal(g,type="boxplot",fill="transparent"))
+```
+
+```{r}
+#correlogram
+library(ggcorrplot)
+
+data("mtcars")
+corr <- round(cor(mtcars),1)
+
+ggcorrplot(corr,hc.order=TRUE,
+           type="lower",
+           lab=TRUE,
+           lab_size=3,
+           method="circle",
+           colors=c("tomato2","white","springgreen3"),
+           title="Correlogram of mtcars",
+           ggtheme = theme_bw)
+```
+
+# 2. Deviation
+```{r}
+#diverging bars
+library(ggplot2)
+theme_set(theme_bw())
+data("mtcars")
+mtcars$'car name' <- rownames(mtcars)
+mtcars$mpg_z <- round((mtcars$mpg-mean(mtcars$mpg))/sd(mtcars$mpg),2) #normalized mpg
+mtcars$mpg_type <- ifelse(mtcars$mpg_z<0,"below","above")
+mtcars <- mtcars[order(mtcars$mpg_z),] #sort first
+mtcars$'car name' <- factor(mtcars$'car name', levels = mtcars$'car name') #convert to factor
+
+ggplot(mtcars,aes(`car name`,y=mpg_z,label=mpg_z))+
+  geom_bar(stat="identity",aes(fill=mpg_type),width=.5)+
+  scale_fill_manual(name="Mileage", labels=c("Above Average","Below Average"),values=c("above"="#00ba38","below"="#f8766d"))+
+  labs(subtitle="Normalizsed mileage from 'mtcars'",title="Diverging Bars")+
+  coord_flip()
+```
+```{r}
+#lollipop chart
+ggplot(mtcars,aes(x=mtcars$`car name`, y=mpg_z,label=mpg_z))+
+  geom_point(stat='identity',fill="blue",size=6) +
+  geom_segment(aes(y=0,x=`car name`,yend=mpg_z,xend=`car name`),color="black")+
+  geom_text(color="white",size=2)+
+  labs(title="Diverging Lollipop Chart",
+       subtitle = "Normalized mileage from 'mtcars':Lollipop")+
+  ylim(-2.5,2.5)+
+  coord_flip()
+```
+
+```{r}
+#Divergin Dot Plot
+ggplot(mtcars,aes(x=`car name`,y=mpg_z,label=mpg_z))+
+  geom_point(stat='identity',aes(col=mpg_type),size=6)+
+  scale_color_manual(name='Mileage',labels=c("Above Average","Below Average"),values=c("above"="#00ba38","below"="#f8766d"))+
+  geom_text(color="white",size=2)+
+  labs(title = "Divering Dot Plot",subtitle = "Normalized mileage from 'mtcars':Dotplot")+
+  ylim(-2.5,2.5)+
+  coord_flip()
+```
+
+```{r}
+#typically used to visualize how a paticular metric performed compared to a certain baseline.
+#Area Chart
+library(quantmod)
+data("economics",package="ggplot2")
+economics$returns_perc <- c(0, diff(economics$psavert)/economics$psavert[-length(economics$psavert)])
+brks <- economics$date[seq(1,length(economics$date),12)]
+lbls <- lubridate::year(economics$date[seq(1,length(economics$date),12)])
+
+ggplot(economics[1:100,],aes(date,returns_perc))+
+  geom_area()+
+  scale_x_date(breaks = brks,labels=lbls)+
+  theme(axis.text.x = element_text(angle = 90))+
+  labs(title="Area Chart",subtitle = "Perc Reurns for Personal Savings",y="% Returns for Personal savings",caption = "Source:enconomics")
+```
+
+# 3. Ranking

@@ -1,0 +1,107 @@
+---
+title: "Data Manipulation with R dplyer"
+author: "Lirong Wei"
+date: "December 2, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(dplyr)
+
+#data:mammals sleep
+library(downloader)
+url <- "https://raw.githubusercontent.com/genomicsclass/dagdata/master/inst/extdata/msleep_ggplot2.csv"
+filename <- "msleep_ggplot2.csv"
+if (!file.exists(filename)) download(url,filename)
+
+msleep <- read.csv("msleep_ggplot2.csv")
+head(msleep)
+```
+
+```{r}
+#selecting columns
+sleepData <- select(msleep,name,sleep_total)
+head(sleepData)
+#select all columns except one
+head(select(msleep,-name))
+#select several columns
+head(select(msleep,name:order))
+#columns start with sl
+head(select(msleep,starts_with("sl")))
+#others
+#ends_with() = Select columns that end with a character string
+#contains() = Select columns that contain a character string
+#matches() = Select columns that match a regular expression
+#one_of() = Select columns names that are from a group of names
+```
+
+```{r}
+#filter rows
+filter(msleep,sleep_total>=16)
+filter(msleep,sleep_total>=16,bodywt>=1)
+filter(msleep,order %in% c("Perissodactyla", "Primates"))
+```
+
+```{r}
+# %>% pipe operater
+msleep %>%
+  select(name,sleep_total) %>%
+  head()
+
+msleep %>%
+  select(name,order,sleep_total)%>%
+  arrange(order,sleep_total) %>%
+  filter(sleep_total >=16)%>%
+  head()
+```
+
+```{r}
+msleep %>%
+  arrange(order) %>%
+  head()
+
+msleep %>%
+  select(name,order,sleep_total) %>%
+  arrange(order,desc(sleep_total))%>%
+  filter(sleep_total>=16)%>%
+  head()
+```
+
+```{r}
+#add new columns
+#mutate
+msleep %>%
+  mutate(rem_proportion = sleep_rem / sleep_total)%>%
+  head()
+
+msleep%>%
+  mutate(rem_proportion = sleep_rem / sleep_total,
+         bodywt_grams = bodywt *1000) %>%
+  head()
+```
+
+```{r}
+#summarise
+msleep%>%
+  summarise(avg_sleep = mean(sleep_total))
+
+#There are many other summary statistics you could consider such sd(), min(), max(), median(), sum(), n() (returns the length of vector), first() (returns first value in vector), last() (returns last value in vector) and n_distinct() (number of distinct values in vector).
+
+msleep %>%
+  summarise(total = n())
+```
+
+```{r}
+#group options using group by
+msleep %>%
+  group_by(order)%>%
+  summarise(avg_total = mean(sleep_total))
+
+```
+
