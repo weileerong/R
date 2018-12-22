@@ -1,0 +1,238 @@
+---
+title: "Data Mining Project"
+author: "Lirong Wei"
+date: "March 22, 2018"
+output:
+  word_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE,cache=TRUE,warning=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## 0. background
+We all know that customer satisfaction or loyal customer is one of the key guarantees of successful business especially for service industry.  Recognizing unsatisfied customers is important for all kinds of service industry like banking. The question related with the dataset in this proposal is proposed by Santander Bank who aims to identify their unsatisfied customers in the early stage of building the customer relationships. With recognition of unhappy customers, they can specify targets and improve the customer experience to retain the unhappy ones.
+We will investigate whether bank customers are satisfied with their banking experience or not, based on a range of features. 
+The data can be downloaded in csv format from https://www.kaggle.com/c/santander-customer-satisfaction/data. The dataset is from Santander Bank. There are 76020 observations on 370 features and 1 response.
+The challenge of thie data set is that it is high dimensional and the class in response is high unblanced, we attemped different methods to deal with it.
+
+**Response:**  "TARGET" is the response variable which is categorical with 2 classes. One for unsatisfied customer and zero for satisfied customer.
+**Features:**  There are 370 anonymized features including customer's ID. Most features are numeric variables. As there are so many features with customers, we need to explore data to identify important features before classification.
+
+
+## 1. Prepare Data
+```{r data,eval=FALSE}
+satisf<- read.csv("train.csv", header = TRUE)
+#There are 370 predictors and 1 response variable
+dim(satisf)
+#Most predictors are numberic,all of them are anoymous
+str(satisf,list.len = 100) 
+#The response variable
+names(satisf)[371] 
+# The satisfied customers and unsatisfied cutomers are unbalanced
+# There are 96 percent of satisfied customers which 4% unsatisfied
+prop.table(table(satisf$TARGET))*100
+```
+
+## 2. Tree based method
+
+```{r eval=FALSE}
+# Split it into train and test
+set.seed(1)
+train<-sample(c(1:nrow(satisf)),nrow(satisf)/2)
+satisf.train<-satisf[train,]
+```
+
+
+```{reval=FALSE}
+#Use classification
+library(tree)
+
+satisf.train$TARGET<-as.factor(satisf.train$TARGET)
+tree.satisfaction<-tree(TARGET~.-ID,data=satisf.train)
+summary(tree.satisfaction)
+plot(tree.satisfaction)
+text(tree.satisfaction,pretty = 0)
+tree.satisfaction
+
+#predict
+satisf.test<-satisf[-train,]
+satisf.test$TARGET<-as.factor(satisf.test$TARGET)
+tree.pred=predict(tree.satisfaction,satisf.test,type="class")
+table(tree.pred,satisf.test$TARGET)
+```
+
+As we can see the tree can only predict zero value because of high unbalance in response value. I may fail to predict satisfied customers. Then we'd like to use random forests.
+
+```{r eval=FALSE}
+library(randomForest)
+set.seed(1)
+rf.satisfaction<-randomForest(TARGET~.-ID,data = satisf.train,ntree=30,importance=TRUE)
+importance(rf.satisfaction)
+
+#Variable Importance
+var.imp = data.frame(importance(rf.satisfaction,  
+                                 type=2))
+var.imp$Variables = row.names(var.imp)  
+print(var.imp[order(var.imp$MeanDecreaseGini,decreasing = T),])
+
+#predict
+rf.pred<-predict(rf.satisfaction,newdata = satisf.test)
+table(rf.pred,satisf.test$TARGET)
+```
+
+As we can see random forest performs better than individual tree of course. The result's specificity is very high while sensitivity is very low. However, we are more care about true positives which indicates accuracy of predicting unsatisfied customers. Acutally, random forest can be used to select a subset of variables that are related to the response. As we know "curse of dimensionality" may greatly influence our analysis, and efficient of computing, therefore, we choose to only use thoes important predictors selected by random forest. 
+
+```{r eval=FALSE}
+#only use the first 20 important varaibles
+attach(satisf)
+subSatisfy<-satisf[,c("TARGET","var15","var38","saldo_var30","saldo_var42","saldo_medio_var5_ult3","saldo_medio_var5_hace2","saldo_medio_var5_hace3","saldo_medio_var5_ult1","saldo_var5","num_var45_ult3","num_var45_hace3","num_var45_hace2","num_var22_ult3","num_med_var45_ult3","num_var45_ult1","num_var22_hace2","imp_op_var41_ult1","imp_op_var39_ult1","num_var22_hace3","num_var22_ult1")]
+subSatisfy.train<-subSatisfy[train,]
+```
+## 3. Logistic regression
+
+Then we used logistics regression, however, as selected variables by random forests can't avoid correaltion between factors which may lead to colliearty and influence results of logstic regression.Therefore, we examined correlation between predictors:
+
+```{r eval=FALSE}
+cor(subSatisfy)
+```
+
+```{r eval=FALSE}
+summary(subSatisfy)
+```
+As we can see from the correlation matrix, many variables are high correlated, so then we used best subset selection:
+
+```{r eval=FALSE}
+library(leaps)
+regfit.full=regsubsets(TARGET~.,subSatisfy,nvmax=20)
+reg.summary=summary(regfit.full)
+par(mforw=c(2,2))
+plot(reg.summary$rss,xlab="Number of Variables",ylab="RSS",type="b")
+plot(reg.summary$adjr2,xlab="Number of Variables",ylab="Adjusted RSq",type="b")
+plot(reg.summary$cp,xlab="Number of Variables",ylab="Cp",type="b")
+plot(reg.summary$bic,xlab="Number of Variables",ylab="bic",type="b")
+points(10,reg.summary$bic[10],col="red",cex=2,pch=20)
+```
+
+From the plot of RSS, adjusted $R^2$, $C_p$ and BIC we can decide using model with 10 variables have the best measure performance.
+
+```{r eval=FALSE}
+coef(regfit.full,10)
+```
+
+
+Now, we can use the ten variables to do prediction using logistics regression.
+
+```{r eval=FALSE}
+#fit logistic regression model
+subSatisfy.train$TARGET=as.factor(subSatisfy.train$TARGET)
+glm.fits<-glm(TARGET~var15+var38+saldo_var30+saldo_var42+saldo_var5+num_var45_ult3+
+                num_med_var45_ult3+imp_op_var39_ult1+
+                num_var45_ult1+num_var22_ult1,
+              data=subSatisfy.train,family = binomial)
+summary(glm.fits)
+
+#predict
+subSatisfy.test=subSatisfy[-train,]
+subSatisfy.test$TARGET=as.factor(subSatisfy.test$TARGET)
+glm.probs=predict(glm.fits,type="response",newdata = subSatisfy.test)
+
+```
+
+
+We need to set threshold for logistics regression result to decide the class.
+```{r eval=FALSE}
+#make sure 1 is for 1 as dummy variable
+contrasts(subSatisfy.train$TARGET)
+glm.pred=rep(0,nrow(subSatisfy.test))
+#0.5 threshold
+glm.pred[glm.probs>0.5]=1
+table(glm.pred,subSatisfy.test$TARGET)
+```
+
+As we can see when threshold is 0.5, it can't predicted 1 correctly at all. So we decrease the threshold in order to improve prediction of the unisatisfied (1) customers.
+
+```{r eval=FALSE}
+glm.pred=rep(0,nrow(subSatisfy.test))
+#0.1 threshold
+glm.pred[glm.probs>0.1]=1
+table(glm.pred,subSatisfy.test$TARGET)
+#0.04 threshould
+glm.pred=rep(0,nrow(subSatisfy.test))
+glm.pred[glm.probs>0.04]=1
+table(glm.pred,subSatisfy.test$TARGET)
+```
+
+Though now we can predict more unsatisfied customers (1041/1041+464) correctly but now the false positive is so high. We can draw the roc curve of the model.
+
+```{r eval=FALSE}
+subSatisfy.test$prob=glm.probs
+library(pROC)
+g <- roc(TARGET ~ prob, data = subSatisfy.test)
+plot(g) 
+auc(g)
+```
+
+## 4. Support vector machine
+
+First, we use the linear kernel.
+```{r eval=FALSE}
+dat=satisf[,c("TARGET","var15","var38","saldo_var30","saldo_var42","saldo_var5","num_var45_ult3","num_med_var45_ult3","imp_op_var39_ult1","num_var45_ult1","num_var22_ult1")]
+dat$TARGET=as.factor(dat$TARGET)
+library(e1071)
+#cross-validation to find the best cost
+set.seed(1)
+tune.out=tune(svm,TARGET~.,data=dat[train,],kenel="linear",ranges=list(cost=c(0.001,0.01,0.1,1,2,3,4,5,10,20,50,80,100)))
+bestmod=tune.out$best.model
+summary(bestmod)
+#predict with best model
+ypred=predict(bestmod,dat[-train,])
+table(predict=ypred,truth=dat[-train,]$TARGET)
+```
+
+We can see that linear model can't predict unsitisfied customers(1), then we try non-linear boundary.
+
+```{r eval=FALSE}
+#use c-v to decide cost and gamma
+set.seed(2)
+tune.out=tune(svm,TARGET~.,data=dat[train,],kenel="radial",ranges=list(cost=c(0.001,0.01,0.1,5,10,50,100)),gamma=c(0.1,1,2,3,4))
+bestmod=tune.out$best.model
+summary(bestmod)
+#predict
+table(true=dat[-train,]$TARGET,predict=predict(bestmod,newdata=dat[-train,]))
+```
+
+It seems that SVM is not suitable in this case, it not able to predict unsatisfied customers. We can look at ROC curve and AUC of SVM model. We can see that it is not as good as logstic regression.
+
+```{r eval=FALSE}
+predict=predict(bestmod,newdata=dat[-train,])
+subSatisfy.test$prob=predict
+g <- roc(TARGET ~ prob, data = subSatisfy.test)
+plot(g) 
+auc(g)
+```
+
+
+Finnaly, we used KNN.
+
+```{r eval=FALSE}
+library(class)
+#when k=1
+knn.pred=knn(train=dat[train,-1],test=dat[-train,-1],dat[train,1],k=1)
+table(knn.pred,dat[-train,1])
+#when k=2
+knn.pred=knn(train=dat[train,-1],test=dat[-train,-1],dat[train,1],k=2)
+table(knn.pred,dat[-train,1])
+```
+
+We can see that K=1 are doing good in predicting unsatisfied customers. But mays be that that result to overfit to the data. Then we repeat using K=2.We can also plot ROC curve and AUC of KNN which is very low. 
+
+```{r eval=FALSE}
+knn.probability=knn(train=dat[train,-1],test=dat[-train,-1],dat[train,1],k=2,prob=TRUE)
+subSatisfy.test$prob=as.numeric(knn.probability)
+g <- roc(TARGET ~ prob, data = subSatisfy.test)
+plot(g) 
+auc(g)
+```
+
+

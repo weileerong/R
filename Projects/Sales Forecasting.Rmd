@@ -1,0 +1,1784 @@
+---
+title: "Project draft"
+author: "Lirong Wei"
+date: "February 14, 2018"
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,cache = TRUE,warning = FALSE)
+```
+
+#1. Introduction
+
+Inventory management of chain stores like Walmart is one of the fundamental and challenging activities in business, which is influenced by various factors including weather. Extreme weather conditions like storm, snow, hot and freezing cold may have a significant effect on sales of product in stores. The major aim of this project is to make a accurate prediction of weather-sensitive products sales in stores to better serving decision-making in inventory management process.
+
+We collected the datasets from Kaggle recruiting competition. The original datasets are three separate files which include the information of sales of 111 anonymous products sold in stores at 45 Walmart retail locations. The sales of all products, such as milk, bread, umbrellas etc., may be affected by the weather. However, all the products are anonymous. The weather reports for the 45 stores are provided by 20 weather stations. The first file contains daily sales of the products from 2012-01-01 to 2014-10-31 in each store, which includes 4617600 observations, with attributes of date, store id, item id and quantity sold of the given day. In addition, no missing value is observed. The second file contains national oceanic and atmospheric administration (NOAA) weather information for each station of the same period (from 2012-0101 to 2014-10-31). Beside station id, there are six aspects of weather feathers are contained in the dataset: temperature, sunrise and sunset time, weather event code (e.g. snow, storm, rain), snowfall and precipitation, pressure and wind. Each feature is represented by several variables. For example, temperature is represented by maximum temperature, minimum temperature, white bulb, dewpoint etc. Unfortunately, each variable in this data set has approximately 5% missing values. And we have no information of store and weather station locations and other details. The third file provides the relational mapping between stores and the weather stations. We build several statistical models based on the provided information, and make predictions of the sales for the given products. 
+
+On the basis of the given datasets, we addressed the following problems of interest.
+
+1.	How to predict sales of the products that are potentially weather-sensitive?
+
+The principal goal of our project is to accurately predict sales of the weather-sensitive (W-S) products. Explore various statistical modelling methods, to find out which are suitable in this case and what methods will result in good accuracy in prediction.
+
+2.	Which products are influenced by extreme weather conditions? 
+
+There are 111 potentially weather-sensitive products, we are curious about how many products are literately affected by defined weather events. What are those real weather-sensitive products?
+
+3.	How much will extreme weather events affect sales of weather-sensitive (W-S) products?
+
+Assuming that there is a portion of product sales are influenced by weather event, we would like to know how the weather event will affect sales of these products. In certain weather conditions, how each kind of W-S product sales is affected (increase of decrease)?  Intuitively, we may expect to observe extreme sales increase of some products during a storm (for example, umbrella). 
+
+4.	 How other factors such as holiday and black Friday affect products sales?
+
+We believe that besides weather, based on the provided data, we can also investigate whether weekend, holiday or black Friday will influence sales, which may improve our prediction accuracy.
+
+All the above questions aim to help inventory managers or marketing managers to make a wise and effective decision to avoid out-of-stock or overstock situations.
+
+  
+
+#2. Method overview
+
+  For predicting sales, we used linear regression, KNN, best subset selection, ridge regression, the lasso, PCA, PLS, polynomial regression, spline, GAMs, regression tree, bagging, boosting, and randomforest. 
+  
+  For factor analysis (both about weather factors and other factors ) we used F-test in linear regression (before that we made sure that there is no collinearity among predictors).
+
+  
+  
+#3. Method details
+ 
+  First, before applying different methods efficiently, I did data preprossing to let us to have a good data to begin with and have a good understanting this including data emerging, predictor extracting, correlation analysis, 
+
+#4. Summary of results
+
+#5. Conclusions and Takeaway
+
+stock planing and management:
+   accoring to weather forecasting...
+   during the hot season...
+   during code reason...
+   before holiday...
+
+#Appendix
+
+## 1. Expoloring the data
+
+### train data set
+
+```{r explore train}
+#Load and check data
+Sales.train <- read.csv("C:/Users/woshi/Documents/train.csv",header = TRUE, na.strings = c(" ", "-") )  
+dim(Sales.train) 
+#there are 461760 observations on 1 response-sales units 
+#and 3 features of products sales
+sales.na <-  is.na(Sales.train)
+summary(sales.na)   #There is no missing values in sales data
+str(Sales.train) 
+#Stores and items are numbered
+#we can identify an item in a store by the combination of store_nbr and item_nbr
+# Through the plot we can see the trend and variation of sales of one product during the
+# time period in train data, some item sales are zero
+Sales.train$date = as.Date(Sales.train$date)
+sub <- Sales.train[(Sales.train$date > '2012-01-01') & (Sales.train$date < '2014-04-01'), ]
+s1_i9 <- sub[sub$store_nbr == 1 & sub$item_nbr == 9, ]  #item number 9 in store number 1
+s2_i9 <- sub[sub$store_nbr == 2 & sub$item_nbr == 9, ]
+s1_i11 <- sub[sub$store_nbr == 1 & sub$item_nbr == 11, ]
+s2_i11 <- sub[sub$store_nbr == 2 & sub$item_nbr == 11, ]
+
+par(mfrow=c(2,2))
+with(s1_i9, plot(date, units, type = 'h', col = "lightpink"))
+with(s2_i9, plot(date, units, type = 'h', col = "lightsalmon1"))
+with(s1_i11, plot(date, units, type = 'h', col = "mediumpurple3"))
+with(s2_i11, plot(date, units, type = 'h', col = "lightskyblue1"))
+
+```
+
+### weather data set
+
+```{r explore weather}
+#Load and check data
+weather <- read.csv("C:/Users/woshi/Documents/weather.csv", header = TRUE, na.strings = c("-"," ","M") )
+dim(weather) # There are 20517 observations on 20 features
+str(weather) 
+weather.na <- is.na(weather) # The weather dataset contains missing values
+summary(weather.na)
+```
+
+### key data set
+
+```{r explore key}
+keys <- read.csv("C:/Users/woshi/Documents/key.csv")
+dim(keys) #There are 45 observations and 2 features in data
+str(keys) 
+```
+
+### test data set
+
+```{r explore test}
+test <- read.csv("C:/Users/woshi/Documents/test.csv",header = TRUE)
+str(test)
+```
+
+
+
+## 2. Data Preprocessing
+
+```{r DataPre,eval=FALSE}
+#############################################
+#             1. Emerging data              #
+#############################################
+#Load original data
+train <- read.csv("C:/Users/woshi/Documents/train.csv",header = TRUE)
+weather <- read.csv("C:/Users/woshi/Documents/weather.csv",header = TRUE,na.strings = c("-"," ","M"))
+key <- read.csv("C:/Users/woshi/Documents/key.csv",header = TRUE)
+
+#Merge three date sets
+total1 <- merge(weather,key,by="station_nbr")
+total <- merge(train,total1,by=c("store_nbr","date"),sort = FALSE)
+
+#############################################
+#       2. Add two main features            #
+#############################################
+#Add two variables in total data. 
+#id represent unique number for each store/item. 
+#days represent how many days from 2012-1-1 to the date of the observation
+total$days <- as.numeric(as.Date(total[,2],"%Y-%m-%d")-as.Date("2012-1-1","%Y-%m-%d")+1)
+total$id <- as.factor(paste(total$store_nbr,total$item_nbr,sep="_"))
+
+#transform factor into numeric which seem to be numeric
+total2 <- total #backup of total
+
+#Save total table
+#write.csv(total,file = "total.csv",row.names = FALSE)
+
+#############################################
+#   3. Split zero and nonzero sales         #
+#############################################
+
+#total <- read.csv("C:/Users/woshi/Documents/total.csv",header = TRUE,na.strings = "NA")
+
+#There are many store/items have no sales
+#split as nonsale and sale
+agg <- aggregate(units~id,total,sum)
+nonsale <- agg[agg$units==0,]  #subsetting of agg
+sale <- agg[agg$units!=0,]     #subsetting of agg
+
+sales <- total[(total$id %in% sale$id),]  #subsetting of total which has store/item has sales
+
+
+#############################################
+#             4.Processing data of         #
+###              (1) date                ####
+#############################################
+#(1)used in linear regression
+#Transform date variable as date
+sales$date=as.Date(sales$date)
+#Create feature of dayOfQuaters, dayOfMonth, dayOfWeek
+sales$dayOfquarters=quarters(sales$date) #factor:Q1,Q2,Q3,Q4
+sales$dayOfquarters=as.factor(sales$dayOfquarters)
+sales$dayOfmonth=as.POSIXlt(sales$date)$mday       #1:31
+sales$dayOfweek=weekdays(sales$date)  #Monday,Tuesday,...
+sales$dayOfweek=as.factor(sales$dayOfweek)
+#Add several feature transforming week and quarter as numeric 
+sales$week <- as.POSIXlt(sales$date)$wday #1,2,3,4,5,6,7
+sales$quarters <- as.numeric(substr(sales$dayOfquarters,2,2)) #1,2,3,4
+
+#Create is_holiday and is_blackFriday
+sales$is_holiday=FALSE
+sales[which(sales$date=="2012-01-01"),"is_holiday"] = TRUE   #New Year's Day
+sales[which(sales$date=="2012-01-02"),"is_holiday"] = TRUE   
+sales[which(sales$date=="2012-01-16"),"is_holiday"] = TRUE   #Martin Luther King Day
+sales[which(sales$date=="2012-02-14"),"is_holiday"] = TRUE   #Valentine's Day
+sales[which(sales$date=="2012-02-20"),"is_holiday"] = TRUE   #Presidents' Day
+sales[which(sales$date=="2012-04-08"),"is_holiday"] = TRUE   #Easter Sunday
+sales[which(sales$date=="2012-05-13"),"is_holiday"] = TRUE   #Mothers' Day 
+sales[which(sales$date=="2012-05-28"),"is_holiday"] = TRUE   #Memorial Day
+sales[which(sales$date=="2012-06-17"),"is_holiday"] = TRUE   #Fathers' Day
+sales[which(sales$date=="2012-07-04"),"is_holiday"] = TRUE   #Independence Day
+sales[which(sales$date=="2012-09-03"),"is_holiday"] = TRUE   #Labor Day
+sales[which(sales$date=="2012-10-08"),"is_holiday"] = TRUE   #Columbus  Day
+sales[which(sales$date=="2012-10-31"),"is_holiday"] = TRUE   #Halloween   
+sales[which(sales$date=="2012-11-06"),"is_holiday"] = TRUE   #Election  Day
+sales[which(sales$date=="2012-11-11"),"is_holiday"] = TRUE   #Veterans  Day
+sales[which(sales$date=="2012-11-12"),"is_holiday"] = TRUE   
+sales[which(sales$date=="2012-11-22"),"is_holiday"] = TRUE   #Thanksgiving  Day
+sales[which(sales$date=="2012-12-24"),"is_holiday"] = TRUE   #Christmas Eve
+sales[which(sales$date=="2012-12-25"),"is_holiday"] = TRUE   #Christmas Day
+sales[which(sales$date=="2012-12-31"),"is_holiday"] = TRUE   #New Year's Eve
+
+sales[which(sales$date=="2013-01-01"),"is_holiday"] = TRUE   #New Year's Day
+sales[which(sales$date=="2013-01-21"),"is_holiday"] = TRUE   #Martin Luther King Day
+sales[which(sales$date=="2013-02-14"),"is_holiday"] = TRUE   #Valentine's Day
+sales[which(sales$date=="2013-02-18"),"is_holiday"] = TRUE   #Presidents'  Day
+sales[which(sales$date=="2013-03-31"),"is_holiday"] = TRUE   #Easter  Day
+sales[which(sales$date=="2013-05-12"),"is_holiday"] = TRUE   #Mothers' Day
+sales[which(sales$date=="2013-05-27"),"is_holiday"] = TRUE   #Memorial  Day
+sales[which(sales$date=="2013-06-16"),"is_holiday"] = TRUE   #Fathers' Day
+sales[which(sales$date=="2013-07-04"),"is_holiday"] = TRUE   #Independence Day
+sales[which(sales$date=="2013-09-02"),"is_holiday"] = TRUE   #Labor  Day
+sales[which(sales$date=="2013-10-14"),"is_holiday"] = TRUE   #Columbus  Day
+sales[which(sales$date=="2013-10-31"),"is_holiday"] = TRUE   #Halloween 
+sales[which(sales$date=="2013-11-11"),"is_holiday"] = TRUE   #Veterans  Day
+sales[which(sales$date=="2013-11-28"),"is_holiday"] = TRUE   #Thanksgiving 
+sales[which(sales$date=="2013-12-24"),"is_holiday"] = TRUE
+sales[which(sales$date=="2013-12-25"),"is_holiday"] = TRUE
+sales[which(sales$date=="2013-12-31"),"is_holiday"] = TRUE
+
+sales[which(sales$date=="2014-01-01"),"is_holiday"] = TRUE
+sales[which(sales$date=="2014-01-20"),"is_holiday"] = TRUE
+sales[which(sales$date=="2014-02-14"),"is_holiday"] = TRUE
+sales[which(sales$date=="2014-02-17"),"is_holiday"] = TRUE
+sales[which(sales$date=="2014-04-13"),"is_holiday"] = TRUE
+sales[which(sales$date=="2014-04-20"),"is_holiday"] = TRUE
+sales[which(sales$date=="2014-05-11"),"is_holiday"] = TRUE
+sales[which(sales$date=="2014-05-26"),"is_holiday"] = TRUE
+sales[which(sales$date=="2014-06-15"),"is_holiday"] = TRUE
+sales[which(sales$date=="2014-07-04"),"is_holiday"] = TRUE
+sales[which(sales$date=="2014-09-01"),"is_holiday"] = TRUE
+sales[which(sales$date=="2014-10-13"),"is_holiday"] = TRUE
+sales[which(sales$date=="2014-10-31"),"is_holiday"] = TRUE
+
+sales$is_blackFriday=FALSE
+sales[which(sales$date=="2012-11-23"),"is_blackFriday"] = TRUE
+sales[which(sales$date=="2013-11-29"),"is_blackFriday"] = TRUE
+
+#############################################
+#           4.Processing data of            #
+###              (2) weather             ####
+#############################################
+
+
+#transform snowfall and preciptotal as numeric and tranform "T" as 0.0 
+sales$snowfall=as.character(sales$snowfall)
+sales$preciptotal=as.character(sales$preciptotal)
+sales[which(sales$snowfall=="  T"),17]="0.0"
+sales[which(sales$preciptotal=="  T"),18]="0.0"
+sales$snowfall <- as.numeric(sales$snowfall)
+sales$preciptotal <- as.numeric(sales$preciptotal)
+
+#create weather feature
+sales$storm = FALSE
+sales$storm[which(sales$preciptotal>0.1)] = TRUE
+sales$hot = FALSE
+sales$hot[which(sales$tmax>=90)] = TRUE
+sales$cold = FALSE
+sales$cold[which(sales$tmax<=45)] = TRUE
+sales$id <- droplevels(sales$id)
+
+#############################################
+#            5.process test set             #
+#############################################
+
+#load test data
+test <- read.csv("C:/Users/woshi/Documents/test.csv",header = TRUE)
+test1 <- merge(weather,key,by="station_nbr")
+test <- merge(test,test1,by=c("date","store_nbr"),sort = FALSE)
+#Add features
+test$id <- as.factor(paste(test$store_nbr,test$item_nbr,sep="_"))
+test$days <- as.numeric(as.Date(test[,"date"],"%Y-%m-%d")-as.Date("2012-1-1","%Y-%m-%d")+1)
+test$date=as.Date(test$date)
+test$dayOfquarters=quarters(test$date) #factor:Q1,Q2,Q3,Q4
+test$dayOfquarters=as.factor(test$dayOfquarters)
+test$dayOfmonth=as.POSIXlt(test$date)$mday       #1:31
+test$dayOfweek=weekdays(test$date)  #Monday,Tuesday,...
+test$dayOfweek=as.factor(test$dayOfweek)
+test$week <- as.POSIXlt(test$date)$wday #numberic 1,2,3,4,5,6,7
+test$quarters <- as.numeric(substr(test$dayOfquarters,2,2)) #1,2,3,4
+test$is_holiday=FALSE
+test[which(test$date=="2012-01-01"),"is_holiday"] = TRUE   #New Year's Day
+test[which(test$date=="2012-01-02"),"is_holiday"] = TRUE   
+test[which(test$date=="2012-01-16"),"is_holiday"] = TRUE   #Martin Luther King Day
+test[which(test$date=="2012-02-14"),"is_holiday"] = TRUE   #Valentine's Day
+test[which(test$date=="2012-02-20"),"is_holiday"] = TRUE   #Presidents' Day
+test[which(test$date=="2012-04-08"),"is_holiday"] = TRUE   #Easter Sunday
+test[which(test$date=="2012-05-13"),"is_holiday"] = TRUE   #Mothers' Day 
+test[which(test$date=="2012-05-28"),"is_holiday"] = TRUE   #Memorial Day
+test[which(test$data=="2012-06-17"),"is_holiday"] = TRUE   #Fathers' Day
+test[which(test$date=="2012-07-04"),"is_holiday"] = TRUE   #Independence Day
+test[which(test$date=="2012-09-03"),"is_holiday"] = TRUE   #Labor Day
+test[which(test$date=="2012-10-08"),"is_holiday"] = TRUE   #Columbus  Day
+test[which(test$date=="2012-10-31"),"is_holiday"] = TRUE   #Halloween   
+test[which(test$date=="2012-11-06"),"is_holiday"] = TRUE   #Election  Day
+test[which(test$date=="2012-11-11"),"is_holiday"] = TRUE   #Veterans  Day
+test[which(test$date=="2012-11-12"),"is_holiday"] = TRUE   
+test[which(test$date=="2012-11-22"),"is_holiday"] = TRUE   #Thanksgiving  Day
+test[which(test$date=="2012-12-24"),"is_holiday"] = TRUE   #Christmas Eve
+test[which(test$date=="2012-12-25"),"is_holiday"] = TRUE   #Christmas Day
+test[which(test$date=="2012-12-31"),"is_holiday"] = TRUE   #New Year's Eve
+test[which(test$date=="2013-01-01"),"is_holiday"] = TRUE   #New Year's Day
+test[which(test$date=="2013-01-21"),"is_holiday"] = TRUE   #Martin Luther King Day
+test[which(test$date=="2013-02-14"),"is_holiday"] = TRUE   #Valentine's Day
+test[which(test$date=="2013-02-18"),"is_holiday"] = TRUE   #Presidents'  Day
+test[which(test$date=="2013-03-31"),"is_holiday"] = TRUE   #Easter  Day
+test[which(test$date=="2013-05-12"),"is_holiday"] = TRUE   #Mothers' Day
+test[which(test$date=="2013-05-27"),"is_holiday"] = TRUE   #Memorial  Day
+test[which(test$date=="2013-06-16"),"is_holiday"] = TRUE   #Fathers' Day
+test[which(test$date=="2013-07-04"),"is_holiday"] = TRUE   #Independence Day
+test[which(test$date=="2013-09-02"),"is_holiday"] = TRUE   #Labor  Day
+test[which(test$date=="2013-10-14"),"is_holiday"] = TRUE   #Columbus  Day
+test[which(test$date=="2013-10-31"),"is_holiday"] = TRUE   #Halloween 
+test[which(test$date=="2013-11-11"),"is_holiday"] = TRUE   #Veterans  Day
+test[which(test$date=="2013-11-28"),"is_holiday"] = TRUE   #Thanksgiving 
+test[which(test$date=="2013-12-24"),"is_holiday"] = TRUE
+test[which(test$date=="2013-12-25"),"is_holiday"] = TRUE
+test[which(test$date=="2013-12-31"),"is_holiday"] = TRUE
+test[which(test$date=="2014-01-01"),"is_holiday"] = TRUE
+test[which(test$date=="2014-01-20"),"is_holiday"] = TRUE
+test[which(test$date=="2014-02-14"),"is_holiday"] = TRUE
+test[which(test$date=="2014-02-17"),"is_holiday"] = TRUE
+test[which(test$date=="2014-04-13"),"is_holiday"] = TRUE
+test[which(test$date=="2014-04-20"),"is_holiday"] = TRUE
+test[which(test$date=="2014-05-11"),"is_holiday"] = TRUE
+test[which(test$date=="2014-05-26"),"is_holiday"] = TRUE
+test[which(test$date=="2014-06-15"),"is_holiday"] = TRUE
+test[which(test$date=="2014-07-04"),"is_holiday"] = TRUE
+test[which(test$date=="2014-09-01"),"is_holiday"] = TRUE
+test[which(test$date=="2014-10-13"),"is_holiday"] = TRUE
+test[which(test$date=="2014-10-31"),"is_holiday"] = TRUE
+test$is_blackFriday=FALSE
+test[which(test$date=="2012-11-23"),"is_blackFriday"] = TRUE
+test[which(test$date=="2013-11-29"),"is_blackFriday"] = TRUE
+test$snowfall=as.character(test$snowfall)
+test$preciptotal=as.character(test$preciptotal)
+test[which(test$snowfall=="  T"),17]="0.0"
+test[which(test$preciptotal=="  T"),18]="0.0"
+test$snowfall <- as.numeric(test$snowfall)
+test$preciptotal <- as.numeric(test$preciptotal)
+test$storm = FALSE
+test$storm[which(test$preciptotal>0.1)] = TRUE
+test$hot = FALSE
+test$hot[which(test$tmax>=90)] = TRUE
+test$cold = FALSE
+test$cold[which(test$tmax<=45)] = TRUE
+
+
+#############################################
+#####     save Processed data            ####
+#############################################
+write.csv(sales,file = "sales.csv",row.names = FALSE)
+write.csv(test,file = "sales_test.csv",row.names = FALSE)
+```
+
+### correlation analysis
+
+```{r correlation}
+sales <- read.csv("C:/Users/woshi/Documents/sales.csv",header = TRUE,na.strings = "NA" )
+#Correlation of weather features
+subSales.weather=sales[,c("units","tmax","tmin","tavg","depart","dewpoint","wetbulb","heat","cool",
+                          "sunrise","sunset",
+                          "snowfall","preciptotal",
+                          "stnpressure","sealevel","resultspeed","resultdir","avgspeed")]
+
+subSales.weather=na.omit(subSales.weather)
+
+cor(subSales.weather)
+
+#pairs(sales[,c("tmax","tmin","tavg","depart","dewpoint","wetbulb","heat","cool")])
+#pairs(sales[,c("tmax","sunrise","sunset","snowfall","preciptotal")])
+#pairs(sales[,c("tmax","stnpressure","resultspeed","resultdir","avgspeed")])
+
+#Correlations of features going to use in models
+cor(sales[,c("units","days","dayOfmonth","week","quarters","is_holiday","is_blackFriday","storm","hot","cold")])
+```
+
+### Glimpse of data of some products
+```{r}
+sales <- read.csv("C:/Users/woshi/Documents/sales.csv",header = TRUE,na.strings = "NA" )
+test <- read.csv("C:/Users/woshi/Documents/sales_test.csv",header = TRUE, na.strings = "NA")
+sales$date=as.Date(sales$date)
+test$date=as.Date(test$date)
+
+# define function to draw plot for items
+draw_id <- function(id) {
+  test$units = "NA"
+  sales_i = sales[which(sales$id==id),c("units","date")]
+  sales_i.test = test[which(test$id==id),c("units","date")]
+  sales_i.test$units = "NA"
+  timeseries_i <- rbind(sales_i,sales_i.test)
+  timeseries <- timeseries_i[order(timeseries_i$date),"units"]
+  ts_i=ts(timeseries,start = c(2012),frequency = 365.25)
+  plot.ts(ts_i,col="blue")
+}
+draw_id("1_28")
+draw_id("2_93")
+draw_id("3_45")
+draw_id("5_93")
+draw_id("9_93")
+```
+
+
+```{r}
+library(lattice)
+subPlot=sales[sales$id=="1_28"|sales$id=="2_93"|sales$id=="3_45",]
+subPlot$id=droplevels(subPlot$id)
+xyplot(units~date,group = id,data = subPlot,auto.key=list(levels(subPlot$id)),type="l")
+```
+
+## 3. Models, Results and Comparisons
+
+```{r training split}
+sales <- read.csv("C:/Users/woshi/Documents/sales.csv",header = TRUE,na.strings = "NA" )
+sales$date=as.Date(sales$date)
+
+salesfull <- sales
+test <- subset(salesfull,date>="2013-04-01")
+sales <- subset(salesfull,date<"2013-04-01") #training set
+vali <- test
+```
+
+###Using best subset selection to select predictors
+
+#### (1) Using Cross-Validation
+```{r BBS select process}
+library(leaps)
+
+#predict method define for regsubsets
+predict.regsubsets =function (object, newdata ,id ,...){
+  form=as.formula (object$call[[2]])
+  mat=model.matrix (form,newdata)
+  coefi =coef(object,id=id)
+  xvars =names(coefi)
+  mat[,xvars ]%*% coefi
+}
+
+sales.select = salesfull[,c("units","days","week","dayOfmonth","quarters",
+                        "is_holiday","is_blackFriday","hot","cold","storm")]
+
+#ten-fold cross-validation to select the best number of predictors 
+k=10
+set.seed (1)
+folds=sample (1:k,nrow(sales.select),replace =TRUE)
+cv.errors =matrix (NA ,k, 9, dimnames =list(NULL, paste(1:9) ))
+
+for(j in 1:k){ 
+   regfit.full=regsubsets(log1p(units)~.,data=sales.select[folds!=j,],
+                          nvmax =9)
+        for(i in 1:9) {
+                       pred=predict(regfit.full,sales.select[folds ==j,], id=i)
+                       cv.errors[j,i]=mean((log1p(sales.select$units[folds ==j])-pred)^2)
+        }
+}
+
+val.errors=colMeans(cv.errors)
+bestid = which.min(val.errors)
+bestid
+#coefficient of best subset
+coef(regfit.full, id = bestid)
+
+reg.fit = regsubsets(log1p(units) ~ ., data = salesfull[,c("units","days","week","dayOfmonth","quarters",
+                      "is_holiday","is_blackFriday","hot","cold","storm")])
+coefi = coef(reg.fit, id = bestid)
+coefi
+```
+
+#### (2) Use Cp,BIC and adjusted R-squared
+
+```{r Cp etc}
+reg.fit = regsubsets(log1p(units) ~ ., data = sales.select, nvmax = 9,really.big=T)
+reg.summary = summary(reg.fit)
+min.cp = min(reg.summary$cp)
+min.bic = min(reg.summary$bic)
+max.adjr2 = max(reg.summary$adjr2)
+
+which(reg.summary$cp==min.cp)
+which(reg.summary$bic==min.bic)
+which(reg.summary$adjr2==max.adjr2)
+
+#Considering Cp,BIC, adjusted R2 and cross-validation, select 7 variables
+reg.fit = regsubsets(log1p(units) ~ ., data = sales.select)
+coefi = coef(reg.fit, id = 7)
+#Selected predictors
+names(coefi)
+```
+
+As we can see seven predictors are selected, so Concerning about different product may have different BSS I'd like to use all the predictors in the following models.
+
+###3.1 Linear regression
+
+```{r LR}
+test$units = 0
+for (id in levels(sales$id)) {
+  sales.train <- sales[which(sales$id==id),]
+  lm.fit <- lm(log1p(units) ~
+                 days+dayOfweek+dayOfquarters+dayOfmonth+
+                 is_holiday+is_blackFriday+hot+cold+storm, data=sales.train)
+  test$units[which(test$id==id)] <-   
+    ceiling(exp(predict(lm.fit,test[which(test$id==id),]))-1)
+}
+test$units[which(test$units<0)]=0
+dif <- sum((log1p(test$units)-log1p(vali$units))^2)
+#Test error
+RMSLE_LR <- sqrt(dif/nrow(test))
+RMSLE_LR
+#coefficient of one product (id=="9_93")
+summary(lm.fit)
+
+###Curve fit with LR
+
+library(lattice)
+#Predicted
+subtest = test[test$id=="1_28"|test$id=="2_93"|test$id=="3_45",]
+#Actual
+subvali = vali[vali$id=="1_28"|vali$id=="2_93"|vali$id=="3_45",]
+subtest$id=droplevels(subtest$id)
+subvali$id=droplevels(subvali$id)
+xyplot(units~date,data =subtest,group=id,auto.key=list(levels(subtest$id)),type="l",main="Sales Predicted by LR")
+xyplot(units~date,auto.key=list(levels(subvali$id)),data =subvali,group=id,type="l")
+```
+
+###3.2 Ridge regression
+
+```{r RR}
+library (glmnet)
+
+test$units = 0
+
+
+grid =10^seq (10,-2,length =100)
+for (id in levels(sales$id)) {
+  sales.train = sales[which(sales$id==id),
+                      c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                        "is_holiday","is_blackFriday","hot","cold","storm")]
+  sales.test = test[which(test$id==id),
+                    c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                      "is_holiday","is_blackFriday","hot","cold","storm")]
+  train.mat = model.matrix(log1p(units)~., data=sales.train)[,-1]
+  test.mat = model.matrix(log1p(units)~., data=sales.test)[,-1]
+  
+  if (sales.train[, "units"]!=0) {
+  ridge.mod = glmnet(train.mat, log1p(sales.train[, "units"]),alpha=0,lambda =grid)
+  
+  set.seed (1)
+  cv.out = cv.glmnet(train.mat, log1p(sales.train[, "units"]), alpha=0)
+  bestlam = cv.out$lambda.min
+  
+  #predict on test set
+  test$units[which(test$id==id)] = ceiling(expm1(predict(ridge.mod, newx=test.mat, s=bestlam)))
+  }
+}
+test$units[which(test$units<0)]=0
+dif <- sum((log1p(test$units)-log1p(vali$units))^2)
+#Test error
+RMSLE_RR <- sqrt(dif/nrow(test))
+RMSLE_RR
+#Coefficient of one product (id=="9_93")
+#Coefficient estimates on the full set
+sales9_93 = salesfull[which(sales$id=="9_93"),
+                      c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                        "is_holiday","is_blackFriday","hot","cold","storm")]
+out = glmnet(model.matrix(log1p(units)~., data=sales9_93)[,-1], log1p(sales9_93[, "units"]), alpha=0)
+ridge.coef = predict(out, s=bestlam, type="coefficients")
+ridge.coef
+
+#Figure of comparison
+#Predicted
+subtest = test[test$id=="1_28"|test$id=="2_93"|test$id=="3_45",]
+#Actual
+subvali = vali[vali$id=="1_28"|vali$id=="2_93"|vali$id=="3_45",]
+subtest$id=droplevels(subtest$id)
+subvali$id=droplevels(subvali$id)
+xyplot(units~date,data =subtest,group=id,auto.key=list(levels(subtest$id)),type="l",main="Sales Predicted by Ridge regression")
+```
+
+### 3.3 The Lasso 
+```{r LASSO}
+library (glmnet)
+
+test$units = 0
+
+grid =10^seq (10,-2,length =100)
+for (id in levels(sales$id)) {
+  sales.train = sales[which(sales$id==id),
+                      c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                        "is_holiday","is_blackFriday","hot","cold","storm")]
+  sales.test = test[which(test$id==id),
+                    c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                      "is_holiday","is_blackFriday","hot","cold","storm")]
+  train.mat = model.matrix(log1p(units)~., data=sales.train)[,-1]
+  test.mat = model.matrix(log1p(units)~., data=sales.test)[,-1]
+  
+  if (sales.train[, "units"]!=0) {
+  lasso.mod = glmnet(train.mat, log1p(sales.train[, "units"]),alpha=1,lambda =grid)
+  
+  set.seed (1)
+  cv.out = cv.glmnet(train.mat, log1p(sales.train[, "units"]), alpha=1)
+  bestlam = cv.out$lambda.min
+  
+  #predict on test set
+  test$units[which(test$id==id)] = ceiling(expm1(predict(lasso.mod, newx=test.mat, s=bestlam)))
+  }
+}
+test$units[which(test$units<0)]=0
+dif <- sum((log1p(test$units)-log1p(vali$units))^2)
+#Test error
+RMSLE_LasR <- sqrt(dif/nrow(test))
+RMSLE_LasR
+#Coefficient of one product (id=="9_93")
+#Coefficient estimates on the full set
+sales9_93 = salesfull[which(sales$id=="9_93"),
+                      c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                        "is_holiday","is_blackFriday","hot","cold","storm")]
+out = glmnet(model.matrix(log1p(units)~., data=sales9_93)[,-1], log1p(sales9_93[, "units"]), alpha=1)
+lasso.coef = predict(out, s=bestlam, type="coefficients")
+lasso.coef
+
+#Figure of comparison
+#Predicted
+subtest = test[test$id=="1_28"|test$id=="2_93"|test$id=="3_45",]
+#Actual
+subvali = vali[vali$id=="1_28"|vali$id=="2_93"|vali$id=="3_45",]
+subtest$id=droplevels(subtest$id)
+subvali$id=droplevels(subvali$id)
+xyplot(units~date,data =subtest,group=id,auto.key=list(levels(subtest$id)),type="l",main="Sales Predicted by The Lasso")
+```
+
+### 3.4 PCA
+
+```{r PCA}
+library (pls)
+
+test$units = 0
+
+#select best ncomp
+for (id in levels(sales$id)) {
+  sales.train = sales[which(sales$id==id),
+                      c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                        "is_holiday","is_blackFriday","hot","cold","storm")]
+  sales.test = test[which(test$id==id),
+                    c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                      "is_holiday","is_blackFriday","hot","cold","storm")]
+  set.seed (2)
+  pcr.fit=pcr(log1p(units)~., data=sales.train, scale =FALSE,validation ="CV")
+  set.seed (3)
+  bestncomp = selectNcomp(pcr.fit, "onesigma", plot = FALSE,ylim = c(0, 3))
+  if (bestncomp == 0 ) {bestncomp = 3}
+  test$units[which(test$id==id)]=
+    ceiling(expm1(predict(pcr.fit, sales.test, ncomp = bestncomp )))
+  if (is.na(test$units[which(test$id==id)])== TRUE) {test$units[which(test$id==id)]=0}
+}
+test$units[which(test$units<0)]=0
+dif <- sum((log1p(test$units)-log1p(vali$units))^2)
+#Test error
+RMSLE_PCR <- sqrt(dif/nrow(test))
+RMSLE_PCR
+
+#Figure of comparison
+#Predicted
+subtest = test[test$id=="1_28"|test$id=="2_93"|test$id=="3_45",]
+#Actual
+subvali = vali[vali$id=="1_28"|vali$id=="2_93"|vali$id=="3_45",]
+subtest$id=droplevels(subtest$id)
+subvali$id=droplevels(subvali$id)
+xyplot(units~date,data =subtest,group=id,auto.key=list(levels(subtest$id)),type="l",main="Sales Predicted by PCA")
+```
+
+### 3.5 PLS
+```{r PLS}
+for (id in levels(sales$id)) {
+  sales.train = sales[which(sales$id==id),
+                      c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                        "is_holiday","is_blackFriday","hot","cold","storm")]
+  sales.test = test[which(test$id==id),
+                    c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                      "is_holiday","is_blackFriday","hot","cold","storm")]
+  set.seed (2)
+  pls.fit=plsr(log1p(units)~., data=sales.train, scale =FALSE,validation ="CV")
+  set.seed (3)
+  bestncomp = selectNcomp(pls.fit, "onesigma", plot = FALSE,ylim = c(0, 3))
+  if (bestncomp == 0 ) {bestncomp = 3}
+  test$units[which(test$id==id)]=
+     ceiling(expm1(predict(pls.fit, sales.test, ncomp = bestncomp )))
+  if (is.na(test$units[which(test$id==id)])== TRUE) {test$units[which(test$id==id)]=0}
+}
+test$units[which(test$units<0)]=0
+dif <- sum((log1p(test$units)-log1p(vali$units))^2)
+#Test error
+RMSLE_PLS <- sqrt(dif/nrow(test))
+RMSLE_PLS
+
+#Figure of comparison
+#Predicted
+subtest = test[test$id=="1_28"|test$id=="2_93"|test$id=="3_45",]
+#Actual
+subvali = vali[vali$id=="1_28"|vali$id=="2_93"|vali$id=="3_45",]
+subtest$id=droplevels(subtest$id)
+subvali$id=droplevels(subvali$id)
+xyplot(units~date,data =subtest,group=id,auto.key=list(levels(subtest$id)),type="l",main="Sales Predicted by PLS")
+```
+
+### 3.6 Best subset selection
+```{r BSS,results = "hide"}
+library(leaps)
+#our own predict method
+predict.regsubsets =function (object, newdata ,id ,...){
+  form=as.formula (object$call[[2]])
+  mat=model.matrix (form,newdata)
+  coefi =coef(object,id=id)
+  xvars =names(coefi)
+  mat[,xvars ]%*% coefi
+}
+
+for (id in levels(sales$id)) {
+  sales.train <- sales[which(sales$id==id),]
+  if (sum(sales.train[,"units"])!=0) {
+        sales.full = salesfull[which(sales$id==id),
+                      c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                        "is_holiday","is_blackFriday","hot","cold","storm")]
+        sales.train = sales[which(sales$id==id),
+                      c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                        "is_holiday","is_blackFriday","hot","cold","storm")]
+        sales.test = test[which(test$id==id),
+                    c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                      "is_holiday","is_blackFriday","hot","cold","storm")]
+
+  
+          #ten-fold Cross-validation
+           k=10
+          set.seed (1)
+          folds=sample (1:k,nrow(sales.full),replace =TRUE)
+         cv.errors =matrix (NA ,k, 9, dimnames =list(NULL, paste(1:9) ))
+          for(j in 1:k){ 
+                regfit.full=regsubsets(log1p(units)~.,data=sales.train[folds!=j,],
+                          nvmax =9)
+    
+                 for(i in 1:9) {
+                       pred=predict(regfit.full,sales.train[folds ==j,], id=i)
+                       cv.errors[j,i]=mean((log1p(sales.train$units[folds ==j])-pred)^2)
+                 }
+           }
+          val.errors=colMeans(cv.errors)
+          bestid = which.min(val.errors)
+  
+         test$units[which(test$id==id)] <-  
+           ceiling(expm1(predict(regfit.full,sales.test, id=bestid)))
+  }
+}
+```
+
+```{r BSS2}
+#Test error
+test$units[which(test$units<0)]=0
+dif <- sum((log1p(test$units)-log1p(vali$units))^2)
+RMSLE_BSS <- sqrt(dif/nrow(test))
+RMSLE_BSS
+
+#Figure of comparison
+#Predicted
+subtest = test[test$id=="1_28"|test$id=="2_93"|test$id=="3_45",]
+#Actual
+subvali = vali[vali$id=="1_28"|vali$id=="2_93"|vali$id=="3_45",]
+subtest$id=droplevels(subtest$id)
+subvali$id=droplevels(subvali$id)
+xyplot(units~date,data =subtest,group=id,auto.key=list(levels(subtest$id)),type="l",main="Sales Predicted by Best Subset Selection")
+```
+
+### 3.7 Polynomial regression
+
+```{r}
+library(boot)
+
+test$units=0
+# 5-fold Cross-validation to decide polynomial degree
+RMSLE.cv <- matrix(0,nrow=5,ncol=10)
+set.seed(1)
+perm.index <- sample(1:length(salesfull$units),length(salesfull$units))
+sales.perm <- salesfull[perm.index,]
+
+for (j in c(1:5)) {
+  start_time <- Sys.time()
+
+  start <- round((j-1)*length(salesfull$units)*0.1)+1
+  end<- ifelse(j<5,round(j*length(salesfull$units)*0.1),length(salesfull$units))
+  vali.index<- start:end
+  train.sales <- sales.perm[-vali.index,]
+  vali.sales <- sales.perm[vali.index,]
+  vali.pred <- vali.sales
+
+  #Degree from 1 to 10
+  for (i in c(1:10)) {
+    for (id in levels(train.sales$id)) {
+      sales.train <- train.sales[which(train.sales$id==id),]
+      if (sum(sales.train[,"units"])!=0) {
+        glm.fit <- glm(log1p(units) ~ poly(days,i)+dayOfweek+dayOfmonth+dayOfquarters
+                       +is_holiday+is_blackFriday
+                       +hot+cold+storm, 
+                       data=sales.train)
+        vali.pred$units[which(vali.pred$id==id)] <- 
+          ceiling(exp(predict(glm.fit,newdata=vali.sales[which(vali.sales$id==id),]))-1)
+      }
+    }
+    dif <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+    RMSLE.cv[j,i] <- sqrt(dif/(dim(vali.pred)[1])) #error
+  }
+
+  print(j) #The jth set
+  print(Sys.time() - start_time) #Compute time
+}
+
+RMSLE <- colMeans(RMSLE.cv)
+i=min(which(RMSLE==min(RMSLE))) #The best i.10
+
+
+#Predict using the best cv degree
+
+for (id in levels(sales$id)) {
+  sales.train <- sales[which(sales$id==id),]
+  
+  if (sum(sales.train[,"units"])!=0) {
+    glm.fit <- glm(log1p(units) ~ poly(days,i)+
+                   dayOfweek+dayOfmonth+dayOfquarters+is_holiday+is_blackFriday
+                   +hot+cold+storm, 
+                   data=sales.train)
+    test$units[which(test$id==id)] <- 
+      round(exp(predict(glm.fit,newdata=test[which(test$id==id),]))-1)
+  }
+}
+
+#The whole test error
+test$units[which(test$units<0)]=0
+dif <- sum((log1p(test$units)-log1p(vali$units))^2)
+#Test error
+RMSLE_PolyR <- sqrt(dif/nrow(test))
+RMSLE_PolyR
+  
+#summary of product 9_93
+summary(glm.fit)
+
+#Figure of comparison
+#Predicted
+subtest = test[test$id=="1_28"|test$id=="2_93"|test$id=="3_45",]
+#Actual
+subvali = vali[vali$id=="1_28"|vali$id=="2_93"|vali$id=="3_45",]
+subtest$id=droplevels(subtest$id)
+subvali$id=droplevels(subvali$id)
+xyplot(units~date,data =subtest,group=id,auto.key=list(levels(subtest$id)),type="l",main="Sales Predicted by Polynomial regression")
+```
+
+### 3.8 Spline
+
+```{r Spline 3.8}
+library(splines)
+
+# 5-fold Cross-validation to decide degree of freedom
+RMSLE.cv <- matrix(0,nrow=5,ncol=20)
+set.seed(1)
+perm.index <- sample(1:length(sales$units),length(sales$units))
+sales.perm <- sales[perm.index,]
+
+for (j in c(1:5)) {
+  start_time <- Sys.time()
+  
+  start <- round((j-1)*length(sales$units)*0.1)+1
+  end<- ifelse(j<5,round(j*length(sales$units)*0.1),length(sales$units))
+  vali.index<- start:end
+  train.sales <- sales.perm[-vali.index,]
+  vali.sales <- sales.perm[vali.index,]
+  vali.pred <- vali.sales
+  
+  #Degree from 1 to 20
+  for (i in c(1:20)) {
+    for (id in levels(train.sales$id)) {
+      sales.train <- train.sales[which(train.sales$id==id),]
+      if (sum(sales.train[,"units"])!=0) {
+        #regression spline
+        glm.fit = glm(log1p(units) ~ bs(days, df = i)+
+                        dayOfweek+dayOfmonth+is_holiday+is_blackFriday
+                      +hot+cold+storm, data=sales.train)
+        vali.pred$units[which(vali.pred$id==id)] <- 
+          ceiling(exp(predict(glm.fit,newdata=vali.sales[which(vali.sales$id==id),]))-1)
+      }
+    }
+    vali.pred$units[which(vali.pred$units<0)]=0
+    dif <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+    RMSLE.cv[j,i] <- sqrt(dif/(dim(vali.pred)[1])) #error
+    
+  }
+  
+  print(j) #The jth set
+  print(Sys.time() - start_time) #Compute time
+}
+
+RMSLE <- colMeans(RMSLE.cv)
+i=min(which(RMSLE==min(RMSLE))) #The best i.
+i
+
+#Predict using the best cv degree
+
+for (id in levels(sales$id)) {
+  sales.train <- sales[which(sales$id==id),]
+  
+  if (sum(sales.train[,"units"])!=0) {
+    glm.fit = glm(log1p(units) ~ bs(days, df = i)+
+                    dayOfweek+dayOfmonth+is_holiday+is_blackFriday
+                  +hot+cold+storm, data=sales.train)
+    test$units[which(test$id==id)] <- 
+      ceiling(exp(predict(glm.fit,newdata=test[which(test$id==id),]))-1)
+  }
+}
+
+
+#summary of product 9_93
+summary(glm.fit)
+#The whole test error
+test$units[which(test$units<0)]=0
+dif <- sum((log1p(test$units)-log1p(vali$units))^2)
+#Test error
+RMSLE_Spline <- sqrt(dif/nrow(test))
+RMSLE_Spline
+
+#Figure of comparison
+#Predicted
+subtest = test[test$id=="1_28"|test$id=="2_93"|test$id=="3_45",]
+#Actual
+subvali = vali[vali$id=="1_28"|vali$id=="2_93"|vali$id=="3_45",]
+subtest$id=droplevels(subtest$id)
+subvali$id=droplevels(subvali$id)
+xyplot(units~date,data =subtest,group=id,auto.key=list(levels(subtest$id)),type="l",main="Sales Predicted by Spline")
+```
+
+### 3.9 GAMS
+
+```{r}
+library(gam)
+
+test$units=0
+#To fit GAMs with selected degree of freedom for each product
+for (id in levels(sales$id)) {
+  sales.train <- sales[which(sales$id==id),]
+  
+  if (sum(sales.train[,"units"])!=0) {
+    #To find the best degree of freedom for days using cross-validation
+    sp.cv=smooth.spline(y=sales.train$units,x=sales.train$days,cv=TRUE)
+    #With predictors selected by Best Subset Selection 
+    #and for days with freedom selected by Cross-Validation sp.cv$df
+    gam.fit = gam(log1p(units) ~ s(days, df = sp.cv$df)+
+                    dayOfweek+dayOfmonth+is_holiday+is_blackFriday
+                  +hot+cold+storm, data=sales.train)
+    test$units[which(test$id==id)] <- 
+      ceiling(exp(predict(gam.fit,newdata=test[which(test$id==id),]))-1)
+  }
+}
+
+#summary of product 9_93
+summary(gam.fit)
+#The whole test error
+test$units[which(test$units<0)]=0
+dif <- sum((log1p(test$units)-log1p(vali$units))^2)
+#Test error
+RMSLE_GAMs <- sqrt(dif/nrow(test))
+RMSLE_GAMs
+
+#Figure of comparison
+#Predicted
+subtest = test[test$id=="1_28"|test$id=="2_93"|test$id=="3_45",]
+#Actual
+subvali = vali[vali$id=="1_28"|vali$id=="2_93"|vali$id=="3_45",]
+subtest$id=droplevels(subtest$id)
+subvali$id=droplevels(subvali$id)
+xyplot(units~date,data =subtest,group=id,auto.key=list(levels(subtest$id)),type="l",main="Sales Predicted by GAM")
+```
+
+
+### 3.10  KNN
+
+```{r KNN3.2}
+library(FNN)
+
+sales <- read.csv("C:/Users/woshi/Documents/sales.csv",header = TRUE,na.strings = "NA" )
+sales$date=as.Date(sales$date)
+test$units = 0
+```
+
+#### Select K: Method 1
+```{r KNN-1}
+#validation set to select K for log1p KNN: K=14
+
+train.sales <- subset(sales,date<"2013-04-01")
+vali.sales <- subset(sales,date>="2013-04-01")
+vali.pred <- vali.sales
+RMSLE <- rep(0,150)
+for (i in c(1:150)) {
+  for (id in levels(train.sales$id)) {
+   sales.train <- train.sales[which(train.sales$id==id),]
+   train.X=sales.train[,c("days","dayOfmonth","cold","hot","storm","week","quarters","is_blackFriday","is_holiday")]
+   train.Y=log1p(sales.train[,"units"])
+   test.X=vali.sales[which(vali.sales$id==id),c("days","dayOfmonth","cold","hot","storm","week","quarters","is_blackFriday","is_holiday")]
+
+      if (dim(test.X)[1]!=0) {
+        knn.pred=knn.reg(train.X,test.X,train.Y,k=i)
+        pred <- as.list(knn.pred)$pred
+        vali.pred$units[which(vali.pred$id==id)] <- ceiling(expm1(pred))
+      }
+  }
+dif <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+RMSLE[i] <- sqrt(dif/(dim(vali.pred)[1]))
+
+}
+
+which(RMSLE==min(RMSLE))
+plot(RMSLE,type="b")
+points(x=which(RMSLE==min(RMSLE)),y=min(RMSLE),col="red",lwd=2,type="p",pch=20)
+```
+
+#### Select K: Method 2
+```{r KNN-2}
+#Cross-vallidation new to select K for log1p KNN: K=6
+RMSLE.cv <- matrix(0,nrow=5,ncol=50)
+set.seed(1)
+perm.index <- sample(1:length(salesfull$units),length(salesfull$units))
+sales.perm <- salesfull[perm.index,]
+
+for (j in c(1:5)) {
+  start_time <- Sys.time()
+
+  start <- round((j-1)*length(salesfull$units)*0.1)+1
+  end<- ifelse(j<5,round(j*length(salesfull$units)*0.1),length(salesfull$units))
+  vali.index<- start:end
+  train.sales <- sales.perm[-vali.index,]
+  vali.sales <- sales.perm[vali.index,]
+  vali.pred <- vali.sales
+
+  for (i in c(1:50)) {
+    for (id in levels(train.sales$id)) {
+      sales.train <- train.sales[which(train.sales$id==id),]
+      train.X=sales.train[,c("days","dayOfmonth","cold","hot","storm","week","quarters",
+                             "is_blackFriday","is_holiday")]
+      train.Y=log1p(sales.train[,"units"])
+      test.X=vali.sales[which(vali.sales$id==id),c("days","dayOfmonth","cold","hot","storm","week","quarters",
+                                                   "is_blackFriday","is_holiday")]
+
+      if (dim(test.X)[1]!=0) {
+        knn.pred=knn.reg(train.X,test.X,train.Y,k=i)
+        pred <- as.list(knn.pred)$pred
+        vali.pred$units[which(vali.pred$id==id)] <- ceiling(expm1(pred))
+      }
+    }
+
+    dif <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+    RMSLE.cv[j,i] <- sqrt(dif/(dim(vali.pred)[1])) #error
+
+  }
+  print(j) #The jth set
+  print(Sys.time() - start_time) #Compute time
+}
+
+RMSLE <- colMeans(RMSLE.cv)
+which(RMSLE==min(RMSLE)) #The best K.
+plot(RMSLE,type="b")
+points(x=which(RMSLE==min(RMSLE)),y=min(RMSLE),col="red",lwd=2,type="p",pch=20)
+```
+
+
+#### Select K: Method 3 (for time series method)
+
+```{r KNN-3}
+# validation set for 5 times
+RMSLE <- matrix(0,nrow=5,ncol=50)
+#1st time
+sales1 <- subset(sales,date<"2012-05-01")
+train.sales <- subset(sales1,date<"2012-03-01")
+vali.sales <- subset(sales1,date>="2012-03-01")
+vali.pred <- vali.sales
+
+for (i in c(1:50)) {
+  for (id in levels(train.sales$id)) {
+   sales.train <- train.sales[which(train.sales$id==id),]
+   train.X=sales.train[,c("days","dayOfmonth","cold","hot","storm","week","quarters","is_blackFriday","is_holiday")]
+   train.Y=log1p(sales.train[,"units"])
+   test.X=vali.sales[which(vali.sales$id==id),c("days","dayOfmonth","cold","hot","storm","week","quarters","is_blackFriday","is_holiday")]
+
+      if (dim(test.X)[1]!=0) {
+        knn.pred=knn.reg(train.X,test.X,train.Y,k=i)
+        pred <- as.list(knn.pred)$pred
+        vali.pred$units[which(vali.pred$id==id)] <- ceiling(expm1(pred))
+      }
+  }
+dif <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+RMSLE[1,i] <- sqrt(dif/(dim(vali.pred)[1]))
+}
+print(1)
+
+#2ed time
+sales2 <- subset(sales,date<"2012-09-01")
+train.sales <- subset(sales2,date<"2012-05-01")
+vali.sales <- subset(sales2,date>="2012-05-01")
+vali.pred <- vali.sales
+
+for (i in c(1:50)) {
+  for (id in levels(train.sales$id)) {
+    sales.train <- train.sales[which(train.sales$id==id),]
+    train.X=sales.train[,c("days","dayOfmonth","cold","hot","storm","week","quarters","is_blackFriday","is_holiday")]
+    train.Y=log1p(sales.train[,"units"])
+    test.X=vali.sales[which(vali.sales$id==id),c("days","dayOfmonth","cold","hot","storm","week","quarters","is_blackFriday","is_holiday")]
+
+    if (dim(test.X)[1]!=0 & dim(train.X)[1]!=0) {
+      knn.pred=knn.reg(train.X,test.X,train.Y,k=i)
+      pred <- as.list(knn.pred)$pred
+      vali.pred$units[which(vali.pred$id==id)] <- ceiling(expm1(pred))
+    }
+  }
+  dif <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+  RMSLE[2,i] <- sqrt(dif/(dim(vali.pred)[1]))
+}
+print(2)
+
+#3rd time
+sales3 <- subset(sales,date<"2013-01-01")
+train.sales <- subset(sales3,date<"2012-09-01")
+vali.sales <- subset(sales3,date>="2012-09-01")
+
+vali.pred <- vali.sales
+
+for (i in c(1:50)) {
+  for (id in levels(train.sales$id)) {
+    sales.train <- train.sales[which(train.sales$id==id),]
+    train.X=sales.train[,c("days","dayOfmonth","cold","hot","storm","week","quarters","is_blackFriday","is_holiday")]
+    train.Y=log1p(sales.train[,"units"])
+    test.X=vali.sales[which(vali.sales$id==id),c("days","dayOfmonth","cold","hot","storm","week","quarters","is_blackFriday","is_holiday")]
+
+    if (dim(test.X)[1]!=0) {
+      knn.pred=knn.reg(train.X,test.X,train.Y,k=i)
+      pred <- as.list(knn.pred)$pred
+      vali.pred$units[which(vali.pred$id==id)] <- ceiling(expm1(pred))
+    }
+  }
+  dif <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+  RMSLE[3,i] <- sqrt(dif/(dim(vali.pred)[1]))
+}
+print(3)
+
+#4th time
+sales4 <- subset(sales,date<"2013-04-01")
+train.sales <- subset(sales4,date<"2013-01-01")
+vali.sales <- subset(sales4,date>="2013-01-01")
+
+vali.pred <- vali.sales
+
+for (i in c(1:50)) {
+  for (id in levels(train.sales$id)) {
+    sales.train <- train.sales[which(train.sales$id==id),]
+    train.X=sales.train[,c("days","dayOfmonth","cold","hot","storm","week","quarters","is_blackFriday","is_holiday")]
+    train.Y=log1p(sales.train[,"units"])
+    test.X=vali.sales[which(vali.sales$id==id),c("days","dayOfmonth","cold","hot","storm","week","quarters","is_blackFriday","is_holiday")]
+
+    if (dim(test.X)[1]!=0) {
+      knn.pred=knn.reg(train.X,test.X,train.Y,k=i)
+      pred <- as.list(knn.pred)$pred
+      vali.pred$units[which(vali.pred$id==id)] <- ceiling(expm1(pred))
+    }
+  }
+  dif <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+  RMSLE[4,i] <- sqrt(dif/(dim(vali.pred)[1]))
+}
+print(4)
+
+#5th time
+train.sales <- subset(sales,date<"2013-04-01")
+vali.sales <- subset(sales,date>="2013-04-01")
+
+vali.pred <- vali.sales
+
+for (i in c(1:50)) {
+  for (id in levels(train.sales$id)) {
+    sales.train <- train.sales[which(train.sales$id==id),]
+    train.X=sales.train[,c("days","dayOfmonth","cold","hot","storm","week","quarters","is_blackFriday","is_holiday")]
+    train.Y=log1p(sales.train[,"units"])
+    test.X=vali.sales[which(vali.sales$id==id),c("days","dayOfmonth","cold","hot","storm","week","quarters","is_blackFriday","is_holiday")]
+
+    if (dim(test.X)[1]!=0) {
+      knn.pred=knn.reg(train.X,test.X,train.Y,k=i)
+      pred <- as.list(knn.pred)$pred
+      vali.pred$units[which(vali.pred$id==id)] <- ceiling(expm1(pred))
+    }
+  }
+  dif <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+  RMSLE[5,i] <- sqrt(dif/(dim(vali.pred)[1]))
+}
+print(5)
+
+RMSLE2 <- colMeans(RMSLE)
+which(RMSLE2==min(RMSLE2)) #The best K.
+plot(RMSLE2,type="b")
+points(x=which(RMSLE==min(RMSLE)),y=min(RMSLE),col="red",lwd=2,type="p",pch=20)
+```
+
+### KNN Predict
+```{r KNN}
+test$units=0
+for (id in levels(sales$id)) {
+  sales.train <- sales[which(sales$id==id),]
+  
+  if (sum(sales.train[,"units"])!=0) {
+    
+      train.X=sales.train[,c("days","dayOfmonth","cold","hot","storm","week","quarters","is_blackFriday","is_holiday")]
+      train.Y=log1p(sales.train[,"units"])
+      test.X=test[which(test$id==id),c("days","dayOfmonth","cold","hot","storm","week","quarters","is_blackFriday","is_holiday")]
+  
+       if (dim(test.X)[1]!=0) {
+             knn.pred=knn.reg(train.X,test.X,train.Y,k=6)
+             pred <- as.list(knn.pred)$pred
+             test$units[which(test$id==id)] <- ceiling(expm1(pred))
+        }
+  }
+}
+
+#Test error
+dif <- sum((log1p(test$units)-log1p(vali$units))^2)
+RMSLE_KNN <- sqrt(dif/nrow(test))
+RMSLE_KNN
+```
+
+###Curve fit with KNN
+
+```{r}
+library(lattice)
+#Predicted
+subtest = test[test$id=="1_28"|test$id=="2_93"|test$id=="3_45",]
+#Actual
+subvali = vali[vali$id=="1_28"|vali$id=="2_93"|vali$id=="3_45",]
+subtest$id=droplevels(subtest$id)
+subvali$id=droplevels(subvali$id)
+xyplot(units~date,data =subtest,group=id,auto.key=list(levels(subtest$id)),type="l",main="Sales Predicted by KNN")
+```
+
+### 3.11 Regression Tree
+
+```{r Regression Tree}
+library(tree)
+test$units = 0
+for (id in levels(sales$id)) {
+  sales.train <- sales[which(sales$id==id),]
+  #Fit a regression tree
+  tree.sales <- tree(log1p(units) ~
+                 days+dayOfweek+dayOfquarters+dayOfmonth+
+                 is_holiday+is_blackFriday+hot+cold+storm, data=sales.train)
+  #Predict using full tree
+  test$units[which(test$id==id)] <-   
+    ceiling(exp(predict(tree.sales,newdata=test[which(test$id==id),]))-1)
+}
+#calculate the RMSLE
+test$units[which(test$units<0)]=0
+dif <- sum((log1p(test$units)-log1p(vali$units))^2)
+#Test error
+RMSLE_RT <- sqrt(dif/nrow(test))
+RMSLE_RT
+#Tree of one product (id=="9_93")
+summary(tree.sales)
+plot(tree.sales)
+text(tree.sales,pretty=0)
+
+###Curve fit with RT
+library(lattice)
+#Predicted
+subtest = test[test$id=="1_28"|test$id=="2_93"|test$id=="3_45",]
+#Actual
+subvali = vali[vali$id=="1_28"|vali$id=="2_93"|vali$id=="3_45",]
+subtest$id=droplevels(subtest$id)
+subvali$id=droplevels(subvali$id)
+xyplot(units~date,data =subtest,group=id,auto.key=list(levels(subtest$id)),type="l",main="Sales Predicted by Regression Tree")
+```
+
+### 3.12 Bagging and Random Forests
+
+#### a. Bagging
+```{r bagging}
+library(randomForest)
+
+test$units = 0
+for (id in levels(sales$id)) {
+  sales.train <- sales[which(sales$id==id),]
+  #Fit bagging
+  set.seed(1)
+  bag.sales <- randomForest(log1p(units) ~
+                 days+dayOfweek+dayOfquarters+dayOfmonth+
+                 is_holiday+is_blackFriday+hot+cold+storm, data=sales.train,
+                 mtry=9,importance=TRUE)
+  #Predict
+  test$units[which(test$id==id)] <-   
+    ceiling(exp(predict(bag.sales,newdata=test[which(test$id==id),]))-1)
+}
+#calculate the RMSLE
+test$units[which(test$units<0)]=0
+dif <- sum((log1p(test$units)-log1p(vali$units))^2)
+#Test error
+RMSLE_Bagging <- sqrt(dif/nrow(test))
+RMSLE_Bagging
+#importance of each variable for the product (id=="9_93")
+importance(bag.sales)
+varImpPlot(bag.sales)
+
+###Curve fit with Bagging
+#Predicted
+subtest = test[test$id=="1_28"|test$id=="2_93"|test$id=="3_45",]
+#Actual
+subtest$id=droplevels(subtest$id)
+xyplot(units~date,data =subtest,group=id,auto.key=list(levels(subtest$id)),type="l",main="Sales Predicted by Bagging")
+```
+
+#### b. Random Forests
+```{r random forests}
+test$units = 0
+for (id in levels(sales$id)) {
+  sales.train <- sales[which(sales$id==id),]
+  #Fit random forests
+  set.seed(1)
+  rf.sales <- randomForest(log1p(units) ~
+                 days+dayOfweek+dayOfquarters+dayOfmonth+
+                 is_holiday+is_blackFriday+hot+cold+storm, data=sales.train,
+                 mtry=3,importance=TRUE)
+  #Predict
+  test$units[which(test$id==id)] <-   
+    ceiling(exp(predict(rf.sales,newdata=test[which(test$id==id),]))-1)
+}
+#calculate the RMSLE
+test$units[which(test$units<0)]=0
+dif <- sum((log1p(test$units)-log1p(vali$units))^2)
+#Test error
+RMSLE_RF <- sqrt(dif/nrow(test))
+RMSLE_RF
+#importance of each variable for the product (id=="9_93")
+importance(bag.sales)
+varImpPlot(bag.sales)
+
+###Curve fit with Random Forests
+#Predicted
+subtest = test[test$id=="1_28"|test$id=="2_93"|test$id=="3_45",]
+#Actual
+subtest$id=droplevels(subtest$id)
+xyplot(units~date,data =subtest,group=id,auto.key=list(levels(subtest$id)),type="l",main="Sales Predicted by Random Forests")
+```
+
+### 3.13 Boosting
+
+```{r boosting}
+library(gbm)
+
+sales$is_blackFriday=as.factor(sales$is_blackFriday)
+sales$is_holiday=as.factor(sales$is_holiday)
+sales$hot=as.factor(sales$hot)
+sales$cold=as.factor(sales$cold)
+sales$storm=as.factor(sales$storm)
+
+test$is_blackFriday=as.factor(test$is_blackFriday)
+test$is_holiday=as.factor(test$is_holiday)
+test$hot=as.factor(test$hot)
+test$cold=as.factor(test$cold)
+test$storm=as.factor(test$storm)
+
+test$units = 0
+for (id in levels(sales$id)) {
+  sales.train <- sales[which(sales$id==id),]
+  #Fit boosting
+  set.seed(1)
+  boost.sales <- gbm(log1p(units) ~
+                 days+dayOfweek+dayOfquarters+dayOfmonth+
+                 is_holiday+is_blackFriday+hot+cold+storm, data=sales.train,
+                 distribution="gaussian",n.trees = 5000,
+                 interaction.depth = 4)
+  #Predict
+  test$units[which(test$id==id)] <-   
+    ceiling(exp(predict(boost.sales,newdata=test[which(test$id==id),],
+                        n.trees = 5000))-1)
+}
+#calculate the RMSLE
+test$units[which(test$units<0)]=0
+dif <- sum((log1p(test$units)-log1p(vali$units))^2)
+#Test error
+RMSLE_Boosting <- sqrt(dif/nrow(test))
+RMSLE_Boosting
+#importance of each variable for the product (id=="9_93")
+summary(boost.sales)
+
+###Curve fit with Boosting
+#Predicted
+subtest = test[test$id=="1_28"|test$id=="2_93"|test$id=="3_45",]
+#Actual
+subtest$id=droplevels(subtest$id)
+xyplot(units~date,data =subtest,group=id,auto.key=list(levels(subtest$id)),type="l",main="Sales Predicted by Boosting")
+
+```
+
+
+###Comparisons of models
+
+#### First, compare test RMSLE of models
+```{r compare test RMSLE}
+# First, compare test RMSLE of models
+Models=c("LR","RR","Lasso","PCA","PLS","BSS","PR","Spl","KNN",
+         "RT","Bg","RF","Bst")
+RMSLE_trainSet=c(RMSLE_LR,RMSLE_RR,RMSLE_LasR,RMSLE_PCR,RMSLE_PLS,RMSLE_BSS,RMSLE_PolyR,RMSLE_Spline,RMSLE_KNN,RMSLE_RT,RMSLE_Bagging,RMSLE_RF,RMSLE_Boosting)
+
+ModelsOntrain=data.frame(Models,RMSLE_trainSet)
+ModelsOntrain$Models=factor(ModelsOntrain$Models)
+ModelsOntrain
+plot(ModelsOntrain,ylab="RMSLE",xlab="Methods",main="Vilidation set error",type="b")
+
+# Second, compare models through cross validation
+
+```
+
+#### Second, compare models through cross validation
+
+```{r compare CV error,results="hide"}
+sales <- read.csv("C:/Users/woshi/Documents/sales.csv",header = TRUE,na.strings = "NA" )
+#5-fold Cross-validation
+set.seed(1)
+perm.index <- sample(1:length(sales$units),length(sales$units))
+sales.perm <- sales[perm.index,]
+#14 models
+#5*14 matrix save model errors
+#col 1 for liner regression model, col 2 for KNN
+RMSLE.cv <- matrix(0,nrow=5,ncol=14)
+for (j in c(1:5)) {
+    start_time <- Sys.time()
+    start <- round((j-1)*length(sales$units)*0.1)+1
+    end<- ifelse(j<5,round(j*length(sales$units)*0.1),length(sales$units))
+    vali<- start:end
+    #train part
+    train.sales <- sales.perm[-vali,]
+    #validation part
+    vali.sales <- sales.perm[vali,]
+    vali.pred <- vali.sales
+        ###########################################
+        #(1) Linear regression model
+            vali.pred$units = 0
+            for (id in levels(train.sales$id)) {
+                 sales.train <- train.sales[which(train.sales$id==id),]
+                 lm.fit <- lm(log1p(units) ~
+                     days+dayOfweek+dayOfquarters+dayOfmonth+
+                     is_holiday+is_blackFriday+hot+cold+storm, data=sales.train)
+                 vali.pred$units[which(vali.pred$id==id)] <-
+                   ceiling(exp(predict(lm.fit,vali.pred[which(vali.pred$id==id),]))-1)
+            }
+            vali.pred$units[which(vali.pred$units<0)]=0
+            dif <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+            #[1] error of linear regression
+            RMSLE.cv[j,1] <- sqrt(dif/(nrow(vali.pred)))
+        ##########################################
+        #(2) KNN    
+           vali.pred$units=0
+           for (id in levels(train.sales$id)) {
+               sales.train <- train.sales[which(train.sales$id==id),]
+               if (sum(sales.train[,"units"])!=0) {
+                  train.X=sales.train[,c("days","dayOfmonth","cold","hot","storm","week"
+                                      ,"quarters","is_blackFriday","is_holiday")]
+                  train.Y=log1p(sales.train[,"units"])
+                  test.X=vali.pred[which(vali.pred$id==id),c("days","dayOfmonth","cold",
+                                                      "hot","storm","week","quarters",                                                      "is_blackFriday","is_holiday")]
+                  if (dim(test.X)[1]!=0) {
+                     knn.pred=knn.reg(train.X,test.X,train.Y,k=6)
+                     pred <- as.list(knn.pred)$pred
+                     vali.pred$units[which(vali.pred$id==id)] <- ceiling(expm1(pred))
+                  }
+               }
+           } 
+          dif2 <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+          RMSLE.cv[j,2] <- sqrt(dif2/(dim(vali.pred)[1]))
+         ##########################################
+        #(3)Ridge regression
+        vali.pred$units=0
+        grid =10^seq (10,-2,length =100)
+        for (id in levels(train.sales$id)) {
+            sales.train = train.sales[which(train.sales$id==id),
+                      c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                        "is_holiday","is_blackFriday","hot","cold","storm")]
+            sales.test = vali.pred[which(vali.pred$id==id),
+                    c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                      "is_holiday","is_blackFriday","hot","cold","storm")]
+            train.mat = model.matrix(log1p(units)~., data=sales.train)[,-1]
+            test.mat = model.matrix(log1p(units)~., data=sales.test)[,-1]
+  
+            if (sales.train[, "units"]!=0) {
+                ridge.mod = glmnet(train.mat, log1p(sales.train[, "units"]),alpha=0,lambda =grid)
+                set.seed (1)
+                cv.out = cv.glmnet(train.mat, log1p(sales.train[, "units"]), alpha=0)
+                bestlam = cv.out$lambda.min
+                vali.pred$units[which(vali.pred$id==id)] = ceiling(expm1(predict(ridge.mod, newx=test.mat, s=bestlam)))
+            } 
+         }
+        vali.pred$units[which(vali.pred$units<0)]=0
+        dif3 <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+        RMSLE.cv[j,3] <- sqrt(dif3/(dim(vali.pred)[1]))
+         ##########################################
+        #(4)The Lasso
+        vali.pred$units=0
+        grid =10^seq (10,-2,length =100)
+        for (id in levels(train.sales$id)) {
+            sales.train = train.sales[which(train.sales$id==id),
+                      c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                        "is_holiday","is_blackFriday","hot","cold","storm")]
+             sales.test = vali.pred[which(vali.pred$id==id),
+                    c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                      "is_holiday","is_blackFriday","hot","cold","storm")]
+             train.mat = model.matrix(log1p(units)~., data=sales.train)[,-1]
+             test.mat = model.matrix(log1p(units)~., data=sales.test)[,-1]
+             if (sales.train[, "units"]!=0) {
+                lasso.mod = glmnet(train.mat, log1p(sales.train[, "units"]),alpha=1,lambda =grid)
+                set.seed (1)
+                cv.out = cv.glmnet(train.mat, log1p(sales.train[, "units"]), alpha=1)
+                bestlam = cv.out$lambda.min
+                vali.pred$units[which(vali.pred$id==id)] = ceiling(expm1(predict(lasso.mod, newx=test.mat, s=bestlam)))
+            }
+        }
+        vali.pred$units[which(vali.pred$units<0)]=0
+        dif4 <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+        RMSLE.cv[j,4] <- sqrt(dif4/(dim(vali.pred)[1]))
+        
+          ##########################################
+        #(5)PCA
+        vali.pred$units=0
+        for (id in levels(train.sales$id)) {
+          sales.train = train.sales[which(train.sales$id==id),
+                              c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                                "is_holiday","is_blackFriday","hot","cold","storm")]
+          sales.test = vali.pred[which(vali.pred$id==id),
+                            c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                              "is_holiday","is_blackFriday","hot","cold","storm")]
+          set.seed (2)
+          pcr.fit=pcr(log1p(units)~., data=sales.train, scale =FALSE,validation ="CV")
+          set.seed (3)
+          bestncomp = selectNcomp(pcr.fit, "onesigma", plot = FALSE,ylim = c(0, 3))
+          if (bestncomp == 0 ) {bestncomp = 3}
+          vali.pred$units[which(vali.pred$id==id)]=
+            ceiling(expm1(predict(pcr.fit, sales.test, ncomp = bestncomp )))
+          if (is.na(vali.pred$units[which(vali.pred$id==id)])== TRUE) {vali.pred$units[which(vali.pred$id==id)]=0}
+        }
+        vali.pred$units[which(vali.pred$units<0)]=0
+        dif5 <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+        RMSLE.cv[j,5] <- sqrt(dif5/(dim(vali.pred)[1]))
+        
+        ##########################################
+        #(6)PLS
+        vali.pred$units=0
+        for (id in levels(train.sales$id)) {
+             sales.train = train.sales[which(train.sales$id==id),
+                      c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                        "is_holiday","is_blackFriday","hot","cold","storm")]
+             sales.test = vali.pred[which(vali.pred$id==id),
+                               c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                                 "is_holiday","is_blackFriday","hot","cold","storm")]
+             set.seed (2)
+             pls.fit=plsr(log1p(units)~., data=sales.train, scale =FALSE,validation ="CV")
+             set.seed (3)
+             bestncomp = selectNcomp(pls.fit, "onesigma", plot = FALSE,ylim = c(0, 3))
+             if (bestncomp == 0 ) {bestncomp = 3}
+             vali.pred$units[which(vali.pred$id==id)]=
+               ceiling(expm1(predict(pls.fit, sales.test, ncomp = bestncomp )))
+             if (is.na(vali.pred$units[which(vali.pred$id==id)])== TRUE) {vali.pred$units[which(vali.pred$id==id)]=0}
+        }
+        vali.pred$units[which(vali.pred$units<0)]=0
+        dif6 <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+        RMSLE.cv[j,6] <- sqrt(dif6/(dim(vali.pred)[1]))
+        
+        ##########################################
+        #(7)BSS
+        vali.pred$units=0
+        for (id in levels(train.sales$id)) {
+             if (sum(sales.train[,"units"])!=0) {
+               sales.train = train.sales[which(train.sales$id==id),
+                                   c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                                     "is_holiday","is_blackFriday","hot","cold","storm")]
+               sales.test = vali.pred[which(vali.pred$id==id),
+                                 c("units","days","dayOfweek","dayOfquarters","dayOfmonth",
+                                   "is_holiday","is_blackFriday","hot","cold","storm")]
+               
+               
+               #ten-fold Cross-validation
+               k=10
+               set.seed (1)
+               folds=sample (1:k,nrow(sales.train),replace =TRUE)
+               cv.errors =matrix (NA ,k, 9, dimnames =list(NULL, paste(1:9) ))
+               for(l in 1:k){ 
+                 regfit.full=regsubsets(log1p(units)~.,data=sales.train[folds!=l,],
+                                        nvmax =9)
+                 
+                 for(i in 1:9) {
+                   pred=predict(regfit.full,sales.train[folds ==l,], id=i)
+                   cv.errors[l,i]=mean((log1p(sales.train$units[folds ==l])-pred)^2)
+                 }
+               }
+               val.errors=colMeans(cv.errors)
+               bestid = which.min(val.errors)
+               vali.pred$units[which(vali.pred$id==id)] <-  
+                 ceiling(expm1(predict(regfit.full,sales.test, id=bestid)))
+          }
+        }
+        vali.pred$units[which(vali.pred$units<0)]=0
+        dif7 <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+        RMSLE.cv[j,7] <- sqrt(dif7/(dim(vali.pred)[1])) 
+        ##########################################
+        #(8)Polynomial regression        
+        vali.pred$units=0
+        for (id in levels(train.sales$id)) { 
+            sales.train <- train.sales[which(train.sales$id==id),]
+            if (sum(sales.train[,"units"])!=0) {
+              glm.fit <- glm(log1p(units) ~ poly(days,10)+ #polynomial degress selected through cv
+                               dayOfweek+dayOfmonth+dayOfquarters+is_holiday+is_blackFriday
+                             +hot+cold+storm, 
+                             data=sales.train)
+              vali.pred$units[which(vali.pred$id==id)] <- 
+                round(exp(predict(glm.fit,newdata=vali.pred[which(vali.pred$id==id),]))-1)
+            }
+        }
+        vali.pred$units[which(vali.pred$units<0)]=0
+        dif8 <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+        RMSLE.cv[j,8] <- sqrt(dif8/(dim(vali.pred)[1])) 
+        ##########################################
+        #(9)Spline 
+        vali.pred$units=0
+        for (id in levels(train.sales$id)) { 
+            sales.train <- train.sales[which(train.sales$id==id),]
+            if (sum(sales.train[,"units"])!=0) {
+              glm.fit = glm(log1p(units) ~ bs(days, df = 11)+  #degree of freedom selected by cv
+                              dayOfweek+dayOfmonth+is_holiday+is_blackFriday
+                            +hot+cold+storm, data=sales.train)
+              vali.pred$units[which(vali.pred$id==id)] <-
+                ceiling(exp(predict(glm.fit,newdata=vali.pred[which(vali.pred$id==id),]))-1)
+            }
+        }
+        vali.pred$units[which(vali.pred$units<0)]=0
+        dif9 <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+        RMSLE.cv[j,9] <- sqrt(dif9/(dim(vali.pred)[1])) 
+        ##########################################
+        #(10)GAMs 
+        vali.pred$units=0
+        for (id in levels(train.sales$id)) {         
+           sales.train <- train.sales[which(train.sales$id==id),]
+           if (sum(sales.train[,"units"])!=0) {
+             #To find the best degree of freedom for days using cross-validation
+             sp.cv=smooth.spline(y=sales.train$units,x=sales.train$days,cv=TRUE)
+             #With predictors selected by Best Subset Selection
+             #and for days with freedom selected by Cross-Validation sp.cv$df
+             gam.fit = gam(log1p(units) ~ s(days, df = sp.cv$df)+
+                             dayOfweek+dayOfmonth+is_holiday+is_blackFriday
+                           +hot+cold+storm, data=sales.train)
+             vali.pred$units[which(vali.pred$id==id)] <-
+               ceiling(exp(predict(gam.fit,newdata=vali.pred[which(vali.pred$id==id),]))-1)
+        }
+        vali.pred$units[which(vali.pred$units<0)]=0
+        dif10 <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+        RMSLE.cv[j,10] <- sqrt(dif10/(dim(vali.pred)[1]))
+        }
+        ##########################################
+        #(11)regression tree
+        vali.pred$units=0
+        for (id in levels(train.sales$id)) {         
+           sales.train <- train.sales[which(train.sales$id==id),]
+           tree.sales <- tree(log1p(units) ~
+                                days+dayOfweek+dayOfquarters+dayOfmonth+
+                                is_holiday+is_blackFriday+hot+cold+storm, data=sales.train)
+           #Predict using full tree
+           vali.pred$units[which(vali.pred$id==id)] <-   
+             ceiling(exp(predict(tree.sales,newdata=vali.pred[which(vali.pred$id==id),]))-1)
+        }
+        vali.pred$units[which(vali.pred$units<0)]=0
+        dif11 <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+        RMSLE.cv[j,11] <- sqrt(dif11/(dim(vali.pred)[1])) 
+       ##########################################
+        #(12)bagging
+        vali.pred$units=0
+        for (id in levels(train.sales$id)) {         
+           sales.train <- train.sales[which(train.sales$id==id),]
+             set.seed(1)
+             bag.sales <- randomForest(log1p(units) ~
+                                         days+dayOfweek+dayOfquarters+dayOfmonth+
+                                         is_holiday+is_blackFriday+hot+cold+storm, data=sales.train,
+                                       mtry=9,importance=TRUE)
+             #Predict
+             vali.pred$units[which(vali.pred$id==id)] <-   
+               ceiling(exp(predict(bag.sales,newdata=vali.pred[which(vali.pred$id==id),]))-1)
+        }
+        vali.pred$units[which(vali.pred$units<0)]=0
+        dif12 <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+        RMSLE.cv[j,12] <- sqrt(dif12/(dim(vali.pred)[1]))
+       ##########################################
+        #(13)random forest
+        vali.pred$units=0
+        for (id in levels(train.sales$id)) {         
+           sales.train <- train.sales[which(train.sales$id==id),]
+           set.seed(1)
+           rf.sales <- randomForest(log1p(units) ~
+                                      days+dayOfweek+dayOfquarters+dayOfmonth+
+                                      is_holiday+is_blackFriday+hot+cold+storm, data=sales.train,
+                                    mtry=3,importance=TRUE)
+           #Predict
+           vali.pred$units[which(vali.pred$id==id)] <-   
+             ceiling(exp(predict(rf.sales,newdata=vali.pred[which(vali.pred$id==id),]))-1)
+        }
+        vali.pred$units[which(vali.pred$units<0)]=0
+        dif13 <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+        RMSLE.cv[j,13] <- sqrt(dif13/(dim(vali.pred)[1]))
+       ##########################################
+        #(14)boosting
+        train.sales$is_blackFriday=as.factor(train.sales$is_blackFriday)
+        train.sales$is_holiday=as.factor(train.sales$is_holiday)
+        train.sales$hot=as.factor(train.sales$hot)
+        train.sales$cold=as.factor(train.sales$cold)
+        train.sales$storm=as.factor(train.sales$storm)
+        
+        vali.pred$is_blackFriday=as.factor(vali.pred$is_blackFriday)
+        vali.pred$is_holiday=as.factor(vali.pred$is_holiday)
+        vali.pred$hot=as.factor(vali.pred$hot)
+        vali.pred$cold=as.factor(vali.pred$cold)
+        vali.pred$storm=as.factor(vali.pred$storm)
+        vali.pred$units=0
+        for (id in levels(train.sales$id)) {         
+           sales.train <- train.sales[which(train.sales$id==id),]
+           set.seed(1)
+           boost.sales <- gbm(log1p(units) ~
+                                days+dayOfweek+dayOfquarters+dayOfmonth+
+                                is_holiday+is_blackFriday+hot+cold+storm, data=sales.train,
+                              distribution="gaussian",n.trees = 5000,
+                              interaction.depth = 4)
+           #Predict
+           vali.pred$units[which(vali.pred$id==id)] <-   
+             ceiling(exp(predict(boost.sales,newdata=vali.pred[which(vali.pred$id==id),],
+                                 n.trees = 5000))-1)
+        }
+        vali.pred$units[which(vali.pred$units<0)]=0
+        dif14 <- sum((log1p(vali.sales$units)-log1p(vali.pred$units))^2)
+        RMSLE.cv[j,14] <- sqrt(dif14/(dim(vali.pred)[1]))
+############################################      
+        print(j)
+        print(Sys.time() - start_time) #Compute time
+}
+
+#Mean of 5-fold cross-validation model errors
+RMSLE <- colMeans(RMSLE.cv)
+RMSLE
+plot(RMSLE,type="b")
+
+```
+
+```{r}
+plot(RMSLE,type="b",axes = F,xlab = "Methods",ylab="CV error",col="deepskyblue")
+names<-c("LR","KNN","RR","LS","PC","PLS","BS","PR","Sl","GAM","RT","Bg","RF","Bst")
+axis(1,at=1:14,lab=names)
+box()
+data.frame(RMSLE,names)
+
+data.frame(RMSLE.cv[1,],names)
+plot(RMSLE.cv[1,],col="red",type="b")
+data.frame(RMSLE.cv[2,],names)
+points(RMSLE.cv[2,],col="pink",type="b")
+data.frame(RMSLE.cv[3,],names)
+points(RMSLE.cv[3,],col="yellow",type="b")
+data.frame(RMSLE.cv[4,],names)
+points(RMSLE.cv[4,],col="blue",type="b")
+data.frame(RMSLE.cv[5,],names)
+points(RMSLE.cv[5,],col="green",type="b")
+```
+
+```{r}
+sub = sales[sales$id=="30_51",]
+plot(sub$cold,sub$units,data = sub,col="blue")
+sub2 = sales[sales$id=="1_93",]
+plot(sub$storm,sub$units,data = sub,col="green")
+sub3 = sales[sales$id=="22_54",]
+plot(sub$hot,sub$units,data=sub3,col="red")
+```
+
+
